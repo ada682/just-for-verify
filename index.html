@@ -124,6 +124,8 @@
     </div>
 
     <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
         const tg = window.Telegram.WebApp;
         tg.expand();
         
