@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
     <title>Face Verification</title>
-    <script src="http://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body {
             font-family: 'Roboto', sans-serif;
@@ -14,7 +15,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
             background-color: #f5f5f5;
             color: #333;
         }
@@ -22,6 +23,7 @@
             width: 90%;
             max-width: 500px;
             text-align: center;
+            padding: 20px 0;
         }
         .camera-container {
             width: 100%;
@@ -97,12 +99,18 @@
             font-size: 12px;
             color: #777;
         }
-        #debugInfo {
+        #debug-console {
+            width: 100%;
+            height: 150px;
+            overflow-y: auto;
+            background-color: #000;
+            color: #fff;
+            font-family: monospace;
+            padding: 10px;
             margin-top: 20px;
+            border-radius: 8px;
             font-size: 12px;
-            color: #777;
             text-align: left;
-            display: none;
         }
     </style>
 </head>
@@ -122,11 +130,10 @@
         
         <button id="verifyBtn" class="button" disabled>Verifikasi Wajah</button>
         <button id="altVerifyBtn" class="button">Verifikasi Alternatif</button>
-        <button id="debugBtn" class="button" style="background-color: #777;">Debug Mode</button>
         
         <div id="statusMessage" class="status-message"></div>
         
-        <div id="debugInfo"></div>
+        <div id="debug-console"></div>
         
         <div class="footer">
             @Realsonnet
@@ -134,41 +141,87 @@
     </div>
 
     <script>
-        // Debug function
-        function log(message) {
-            console.log(message);
-            const debugInfo = document.getElementById('debugInfo');
-            const now = new Date().toLocaleTimeString();
-            debugInfo.innerHTML += `<div>[${now}] ${message}</div>`;
+        // Debug logging function
+        function debugLog(message, type = 'info') {
+            const debugConsole = document.getElementById('debug-console');
+            const timestamp = new Date().toLocaleTimeString();
+            let color = '#fff';
+            
+            switch(type) {
+                case 'error':
+                    color = '#ff5252';
+                    break;
+                case 'success':
+                    color = '#4caf50';
+                    break;
+                case 'warning':
+                    color = '#ffc107';
+                    break;
+                default:
+                    color = '#fff';
+            }
+
+            if (typeof message === 'object') {
+                try {
+                    message = JSON.stringify(message);
+                } catch (e) {
+                    message = "[Object can't be stringified]";
+                }
+            }
+            
+            debugConsole.innerHTML += `<div style="color:${color};">[${timestamp}] ${message}</div>`;
+            debugConsole.scrollTop = debugConsole.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
         }
 
-        // Debug toggle
-        document.getElementById('debugBtn').addEventListener('click', function() {
-            const debugInfo = document.getElementById('debugInfo');
-            if (debugInfo.style.display === 'none' || debugInfo.style.display === '') {
-                debugInfo.style.display = 'block';
-            } else {
-                debugInfo.style.display = 'none';
-            }
-        });
-
+        // Get URL parameters
         const urlParams = new URLSearchParams(window.location.search);
         const token = urlParams.get('token');
-        const tg = window.Telegram?.WebApp;
-        
-        // Initial debugging
-        log('Telegram WebApp available: ' + !!window.Telegram?.WebApp);
-        if (tg) {
-            tg.expand();
-            log('Init data exists: ' + !!tg.initData);
-            log('User ID: ' + tg.initDataUnsafe?.user?.id);
-        } else {
-            log('WARNING: Telegram WebApp is not available!');
-        }
-        
         const chatId = urlParams.get('chatId');
-        log('Chat ID from URL: ' + chatId);
-        log('Token from URL: ' + token);
+        
+        debugLog(`Chat ID from URL: ${chatId}`);
+        debugLog(`Token from URL: ${token}`);
+        
+        // Check if Telegram WebApp is available
+        let tg = null;
+        let userId = null;
+        let initData = '';
+        
+        if (window.Telegram && window.Telegram.WebApp) {
+            try {
+                tg = window.Telegram.WebApp;
+                debugLog(`Telegram WebApp available: true`);
+                debugLog(`WebApp version: ${tg.version}`);
+                debugLog(`Platform: ${tg.platform}`);
+                
+                // Try to get initData
+                initData = tg.initData || '';
+                
+                // Get user info if available
+                if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                    userId = tg.initDataUnsafe.user.id;
+                    debugLog(`User ID from Telegram: ${userId}`);
+                    debugLog(`User Info: ${JSON.stringify({
+                        first_name: tg.initDataUnsafe.user.first_name,
+                        username: tg.initDataUnsafe.user.username || 'None'
+                    })}`);
+                } else {
+                    debugLog(`No user data in initDataUnsafe`, 'warning');
+                }
+                
+                // Expand the WebApp
+                tg.expand();
+            } catch (e) {
+                debugLog(`Error initializing Telegram WebApp: ${e.message}`, 'error');
+            }
+        } else {
+            debugLog(`Telegram WebApp available: false`, 'warning');
+            debugLog(`WARNING: Telegram WebApp is not available!`, 'warning');
+            
+            // Fallback - get userId from URL if not available from Telegram
+            userId = urlParams.get('userId') || '';
+            debugLog(`Fallback: Using userId from URL: ${userId || 'Not provided'}`, 'warning');
+        }
         
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
@@ -180,108 +233,125 @@
         
         let stream = null;
         let verificationTimeout = null;
-        const TIMEOUT_DURATION = 120000; // 2 menit dalam milidetik
+        const TIMEOUT_DURATION = 120000; // 2 minutes
         
-        // Inisialisasi data Telegram
-        const initData = tg?.initData || '';
-        const userId = tg?.initDataUnsafe?.user?.id;
-        
-        // Define server URL - use HTTP instead of HTTPS for now
-        const SERVER_URL = 'http://188.166.232.216:3000';
-        
-        // Mulai kamera
+        // Function to start camera
         async function startCamera() {
             try {
-                log('Requesting camera access...');
+                debugLog('Requesting camera access...');
+                
                 stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'user' }
+                    video: { 
+                        facingMode: 'user',
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    }
                 });
-                log('Camera access granted!');
                 
+                debugLog('Camera access granted!', 'success');
                 video.srcObject = stream;
-                verifyBtn.disabled = false;
                 
-                video.onplaying = () => {
-                    log(`Video is playing, dimensions: ${video.videoWidth} x ${video.videoHeight}`);
+                // Check if video is playing and has dimensions
+                video.onloadedmetadata = () => {
+                    debugLog(`Video metadata loaded`);
+                    verifyBtn.disabled = false;
                 };
                 
-                // Mulai timeout untuk verifikasi
-                startVerificationTimeout();
+                video.onplaying = () => {
+                    debugLog(`Video is playing, dimensions: ${video.videoWidth} x ${video.videoHeight}`);
+                    if (video.videoWidth && video.videoHeight) {
+                        verifyBtn.disabled = false;
+                        showStatus('Kamera siap. Silakan klik tombol Verifikasi Wajah.', 'normal');
+                    }
+                };
                 
-                showStatus('Kamera siap. Silakan klik tombol Verifikasi Wajah.', 'normal');
+                // Start verification timeout
+                startVerificationTimeout();
             } catch (err) {
-                log(`Camera error: ${err.name} - ${err.message}`);
-                console.error('Error mengakses kamera:', err);
-                showStatus(`Tidak dapat mengakses kamera: ${err.name}. Silakan gunakan verifikasi alternatif.`, 'error');
+                debugLog(`Error accessing camera: ${err.name} - ${err.message}`, 'error');
+                showStatus(`Tidak dapat mengakses kamera: ${err.message}. Silakan gunakan verifikasi alternatif.`, 'error');
             }
         }
         
-        // Fungsi untuk timeout verifikasi
+        // Function for verification timeout
         function startVerificationTimeout() {
             verificationTimeout = setTimeout(() => {
+                debugLog('Verification timeout reached', 'warning');
                 showStatus('Waktu verifikasi habis. Silakan coba lagi.', 'error');
-                log('Verification timeout reached');
-                if (tg) tg.close();
+                if (tg) {
+                    tg.close();
+                }
             }, TIMEOUT_DURATION);
         }
         
-        // Fungsi verifikasi wajah
+        // Function to verify face
         async function verifyFace() {
-            if (!stream) return;
+            if (!stream) {
+                debugLog('No camera stream available', 'error');
+                showStatus('Kamera tidak tersedia', 'error');
+                return;
+            }
             
+            debugLog('Taking photo and sending verification request...');
             loadingOverlay.style.display = 'flex';
             verifyBtn.disabled = true;
             
-            // Ambil gambar dari video
-            const videoWidth = video.videoWidth;
-            const videoHeight = video.videoHeight;
-            canvas.width = videoWidth;
-            canvas.height = videoHeight;
-            ctx.drawImage(video, 0, 0, videoWidth, videoHeight);
-            
-            // Konversi ke base64
-            const imageData = canvas.toDataURL('image/jpeg', 0.8);
-            
-            log('Taking photo and sending verification request...');
             try {
-                // Kirim data ke backend untuk verifikasi
-                const response = await fetch(`${SERVER_URL}/api/verify`, {
+                // Capture image from video
+                const videoWidth = video.videoWidth || 640;
+                const videoHeight = video.videoHeight || 480;
+                
+                canvas.width = videoWidth;
+                canvas.height = videoHeight;
+                ctx.drawImage(video, 0, 0, videoWidth, videoHeight);
+                
+                // Convert to base64
+                const imageData = canvas.toDataURL('image/jpeg', 0.8);
+                debugLog(`Image captured successfully (${Math.round(imageData.length / 1024)}KB)`);
+                
+                // Create request data
+                const requestData = {
+                    image: imageData,
+                    userId: userId || urlParams.get('userId') || 'unknown',
+                    chatId: chatId,
+                    initData: initData,
+                    token: token
+                };
+                
+                // Try HTTP instead of HTTPS if we're on Vercel (which is already HTTPS)
+                // This helps avoid mixed content issues
+                const apiUrl = 'http://188.166.232.216:3000/api/verify';
+                debugLog(`Sending verification to: ${apiUrl}`);
+
+                // Send data to backend for verification
+                const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        image: imageData,
-                        userId: userId,
-                        chatId: chatId,
-                        initData: initData,
-                        token: token
-                    })
+                    body: JSON.stringify(requestData)
                 });
                 
-                log(`Server response status: ${response.status}`);
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Server responded with ${response.status}: ${errorText}`);
-                }
-                
                 const result = await response.json();
-                log(`Verification result: ${JSON.stringify(result)}`);
+                debugLog(`Verification response: ${JSON.stringify(result)}`);
                 
                 if (result.success) {
+                    debugLog('Verification successful!', 'success');
                     showStatus('Verifikasi berhasil! Anda sekarang dapat chat di grup.', 'success');
                     clearTimeout(verificationTimeout);
                     
                     setTimeout(() => {
-                        if (tg) tg.close();
+                        if (tg) {
+                            tg.close();
+                        }
                     }, 2000);
                 } else {
+                    debugLog(`Verification failed: ${result.message}`, 'error');
                     showStatus(`Verifikasi gagal: ${result.message}`, 'error');
                     verifyBtn.disabled = false;
                 }
             } catch (error) {
-                log(`Error during verification: ${error.message}`);
+                debugLog(`Error during verification: ${error.message}`, 'error');
                 showStatus(`Terjadi kesalahan saat verifikasi: ${error.message}`, 'error');
                 verifyBtn.disabled = false;
             } finally {
@@ -289,78 +359,90 @@
             }
         }
         
+        // Function for alternative verification
         async function alternativeVerification() {
-            log('Starting alternative verification...');
+            debugLog('Starting alternative verification...');
+            
             try {
-                const response = await fetch(`${SERVER_URL}/api/alt-verify`, {
+                // Create request data
+                const requestData = {
+                    userId: userId || urlParams.get('userId') || 'unknown',
+                    chatId: chatId,
+                    initData: initData,
+                    token: token
+                };
+                
+                // Use HTTP API URL
+                const apiUrl = 'http://188.166.232.216:3000/api/alt-verify';
+                debugLog(`Sending alt verification request to: ${apiUrl}`);
+                
+                const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        userId: userId,
-                        chatId: chatId,
-                        initData: initData,
-                        token: token
-                    })
+                    body: JSON.stringify(requestData)
                 });
                 
-                log(`Alt-verify response status: ${response.status}`);
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Server responded with ${response.status}: ${errorText}`);
-                }
-                
                 const result = await response.json();
-                log(`Alt-verify result: ${JSON.stringify(result)}`);
+                debugLog(`Alt verification response: ${JSON.stringify(result)}`);
                 
                 if (result.success) {
-                    const captchaPrompt = prompt(result.captchaQuestion);
-                    log(`User entered captcha: ${captchaPrompt}`);
+                    const captchaQuestion = result.captchaQuestion;
+                    debugLog(`Received captcha question: ${captchaQuestion}`);
+                    
+                    const captchaPrompt = prompt(captchaQuestion);
                     
                     if (captchaPrompt) {
-                        const verifyResponse = await fetch(`${SERVER_URL}/api/verify-captcha`, {
+                        debugLog(`User entered captcha answer: ${captchaPrompt}`);
+                        
+                        const captchaData = {
+                            userId: userId || urlParams.get('userId') || 'unknown',
+                            chatId: chatId,
+                            captchaAnswer: captchaPrompt,
+                            captchaToken: result.captchaToken,
+                            initData: initData,
+                            token: token
+                        };
+                        
+                        debugLog('Verifying captcha answer...');
+                        
+                        const captchaUrl = 'http://188.166.232.216:3000/api/verify-captcha';
+                        const verifyResponse = await fetch(captchaUrl, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
                             },
-                            body: JSON.stringify({
-                                userId: userId,
-                                chatId: chatId,
-                                captchaAnswer: captchaPrompt,
-                                captchaToken: result.captchaToken,
-                                initData: initData
-                            })
+                            body: JSON.stringify(captchaData)
                         });
                         
-                        log(`Captcha verification response status: ${verifyResponse.status}`);
-                        
-                        if (!verifyResponse.ok) {
-                            const errorText = await verifyResponse.text();
-                            throw new Error(`Server responded with ${verifyResponse.status}: ${errorText}`);
-                        }
-                        
                         const verifyResult = await verifyResponse.json();
-                        log(`Captcha verification result: ${JSON.stringify(verifyResult)}`);
+                        debugLog(`Captcha verification result: ${JSON.stringify(verifyResult)}`);
                         
                         if (verifyResult.success) {
+                            debugLog('Alternative verification successful!', 'success');
                             showStatus('Verifikasi alternatif berhasil!', 'success');
                             clearTimeout(verificationTimeout);
                             
                             setTimeout(() => {
-                                if (tg) tg.close();
+                                if (tg) {
+                                    tg.close();
+                                }
                             }, 2000);
                         } else {
-                            showStatus(`Jawaban captcha salah: ${verifyResult.message}`, 'error');
+                            debugLog('Captcha verification failed', 'error');
+                            showStatus('Jawaban captcha salah. Silakan coba lagi.', 'error');
                         }
+                    } else {
+                        debugLog('User cancelled captcha prompt', 'warning');
                     }
                 } else {
-                    showStatus(`Gagal mendapatkan captcha: ${result.message}`, 'error');
+                    debugLog(`Failed to get captcha: ${result.message}`, 'error');
+                    showStatus('Gagal mendapatkan captcha. Silakan coba lagi.', 'error');
                 }
             } catch (error) {
-                log(`Error during alternative verification: ${error.message}`);
-                showStatus(`Terjadi kesalahan: ${error.message}`, 'error');
+                debugLog(`Error during alternative verification: ${error.message}`, 'error');
+                showStatus('Terjadi kesalahan saat verifikasi alternatif.', 'error');
             }
         }
         
@@ -374,17 +456,18 @@
                 statusMessage.classList.add('success');
             }
             
-            log(`Status: ${type} - ${message}`);
+            debugLog(`Status: ${type} - ${message}`);
         }
         
+        // Add event listeners
         verifyBtn.addEventListener('click', verifyFace);
         altVerifyBtn.addEventListener('click', alternativeVerification);
         
-        document.addEventListener('DOMContentLoaded', () => {
-            log('DOM loaded, starting camera...');
-            startCamera();
-        });
+        // Start on page load
+        debugLog('DOM loaded, starting camera...');
+        startCamera();
         
+        // Clean up on page close
         window.addEventListener('beforeunload', () => {
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
