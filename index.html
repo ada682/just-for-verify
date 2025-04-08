@@ -399,20 +399,51 @@
                 const imageData = canvas.toDataURL('image/jpeg', 0.8);
                 debugLog(`Image captured successfully (${Math.round(imageData.length / 1024)}KB)`);
                 
+                // Get information from various sources and use fallbacks
                 const effectiveUserId = userId || userIdFromUrl || localStorage.getItem('userId');
-                const effectiveChatId = chatId || localStorage.getItem('chatId');
+                let effectiveChatId = chatId || localStorage.getItem('chatId');
                 const effectiveToken = token || localStorage.getItem('token');
+                
+                // Check if we have an effectiveToken and if not, try to get chat ID from the verification token
+                if (effectiveToken && !effectiveChatId) {
+                    // If we have a token but no chatId, we need to make a request to get the chatId associated with this token
+                    try {
+                        // Try to get chat ID via the token
+                        const tokenCheckUrl = '/api/token-info';
+                        const tokenResponse = await fetch(tokenCheckUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ token: effectiveToken })
+                        });
+                        
+                        if (tokenResponse.ok) {
+                            const tokenData = await tokenResponse.json();
+                            if (tokenData.success && tokenData.chatId) {
+                                effectiveChatId = tokenData.chatId;
+                                localStorage.setItem('chatId', effectiveChatId);
+                                debugLog(`Retrieved chatId from token: ${effectiveChatId}`, 'success');
+                            }
+                        }
+                    } catch (tokenError) {
+                        debugLog(`Error retrieving chatId from token: ${tokenError.message}`, 'error');
+                    }
+                }
                 
                 debugLog(`Sending verification with userId: ${effectiveUserId}, chatId: ${effectiveChatId}`);
                 
-                if (!effectiveUserId || !effectiveChatId) {
-                    debugLog('CRITICAL ERROR: Missing userId or chatId for verification!', 'error');
-                    debugLog(`userId value: ${effectiveUserId}`, 'error');
-                    debugLog(`chatId value: ${effectiveChatId}`, 'error');
-                    showStatus('Error: User ID atau Chat ID tidak ditemukan. Coba gunakan verifikasi alternatif.', 'error');
+                if (!effectiveUserId) {
+                    debugLog('CRITICAL ERROR: Missing userId for verification!', 'error');
+                    showStatus('Error: User ID tidak ditemukan. Coba gunakan verifikasi alternatif.', 'error');
                     loadingOverlay.style.display = 'none';
                     verifyBtn.disabled = false;
                     return;
+                }
+                
+                if (!effectiveChatId) {
+                    debugLog('WARNING: chatId not found, attempting to proceed with verification anyway', 'warning');
+                    showStatus('Peringatan: Chat ID tidak ditemukan. Mencoba melanjutkan verifikasi...', 'warning');
                 }
                 
                 const requestData = {
@@ -467,15 +498,45 @@
             
             try {
                 const effectiveUserId = userId || userIdFromUrl || localStorage.getItem('userId');
-                const effectiveChatId = chatId || localStorage.getItem('chatId');
+                let effectiveChatId = chatId || localStorage.getItem('chatId');
                 const effectiveToken = token || localStorage.getItem('token');
+                
+                // Similar token-based chatId retrieval for alternative verification
+                if (effectiveToken && !effectiveChatId) {
+                    try {
+                        const tokenCheckUrl = '/api/token-info';
+                        const tokenResponse = await fetch(tokenCheckUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ token: effectiveToken })
+                        });
+                        
+                        if (tokenResponse.ok) {
+                            const tokenData = await tokenResponse.json();
+                            if (tokenData.success && tokenData.chatId) {
+                                effectiveChatId = tokenData.chatId;
+                                localStorage.setItem('chatId', effectiveChatId);
+                                debugLog(`Retrieved chatId from token: ${effectiveChatId}`, 'success');
+                            }
+                        }
+                    } catch (tokenError) {
+                        debugLog(`Error retrieving chatId from token: ${tokenError.message}`, 'error');
+                    }
+                }
                 
                 debugLog(`Alt verification with userId: ${effectiveUserId}, chatId: ${effectiveChatId}`);
                 
-                if (!effectiveUserId || !effectiveChatId) {
-                    debugLog('CRITICAL ERROR: Missing userId or chatId for alt verification!', 'error');
-                    showStatus('Error: User ID atau Chat ID tidak ditemukan.', 'error');
+                if (!effectiveUserId) {
+                    debugLog('CRITICAL ERROR: Missing userId for alt verification!', 'error');
+                    showStatus('Error: User ID tidak ditemukan.', 'error');
                     return;
+                }
+                
+                if (!effectiveChatId) {
+                    debugLog('WARNING: chatId not found, attempting to proceed with alt verification anyway', 'warning');
+                    showStatus('Peringatan: Chat ID tidak ditemukan. Mencoba melanjutkan verifikasi...', 'warning');
                 }
                 
                 const requestData = {
