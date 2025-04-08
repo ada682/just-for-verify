@@ -182,6 +182,9 @@
         const token = urlParams.get('token');
         const chatId = urlParams.get('chatId');
         const userIdFromUrl = urlParams.get('userId');
+
+        debugLog(`Raw URL parameters: ${window.location.search}`);
+        debugLog(`Extracted from URL: token=${token}, chatId=${chatId}, userId=${userIdFromUrl}`);
         
         if (userIdFromUrl) {
             localStorage.setItem('userId', userIdFromUrl);
@@ -445,6 +448,8 @@
                     debugLog('WARNING: chatId not found, attempting to proceed with verification anyway', 'warning');
                     showStatus('Peringatan: Chat ID tidak ditemukan. Mencoba melanjutkan verifikasi...', 'warning');
                 }
+
+                debugLog(`Final values before sending: userId=${effectiveUserId}, chatId=${effectiveChatId}, token=${effectiveToken}`);
                 
                 const requestData = {
                     image: imageData,
