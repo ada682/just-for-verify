@@ -6,54 +6,228 @@
     <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
     <title>Face Verification</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Roboto', sans-serif;
+        :root {
+            --primary: #3390ec;
+            --primary-light: #e9f3ff;
+            --primary-dark: #2980b9;
+            --success: #4CAF50;
+            --success-light: #e8f5e9;
+            --error: #f44336;
+            --error-light: #ffebee;
+            --warning: #ff9800;
+            --warning-light: #fff3e0;
+            --text-primary: #333333;
+            --text-secondary: #757575;
+            --border: #e0e0e0;
+            --bg-light: #f8fafc;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s ease;
+        }
+        
+        * {
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-light);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 0;
+            margin: 0;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            justify-content: center;
+        }
+        
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            max-width: 600px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 24px 16px;
             min-height: 100vh;
-            background-color: #f5f5f5;
-            color: #333;
         }
-        .container {
-            width: 90%;
-            max-width: 500px;
+        
+        .header {
             text-align: center;
-            padding: 20px 0;
+            margin-bottom: 24px;
         }
+        
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+        
+        .header p {
+            font-size: 16px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .privacy-notice {
+            background-color: var(--primary-light);
+            padding: 14px;
+            border-radius: 12px;
+            position: relative;
+            border-left: 4px solid var(--primary);
+            margin: 16px 0;
+            display: flex;
+            align-items: center;
+        }
+        
+        .privacy-notice i {
+            margin-right: 12px;
+            color: var(--primary);
+            font-size: 18px;
+        }
+        
+        .privacy-notice p {
+            margin: 0;
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+        
+        .privacy-notice p strong {
+            font-weight: 600;
+        }
+        
         .camera-container {
             width: 100%;
-            margin: 20px 0;
-            border-radius: 12px;
-            overflow: hidden;
             position: relative;
+            margin: 20px 0;
+            border-radius: 16px;
+            overflow: hidden;
+            aspect-ratio: 4/3;
+            background-color: #000;
+            box-shadow: var(--shadow);
         }
+        
         #video {
             width: 100%;
-            background-color: #000;
-            border-radius: 12px;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 16px;
+            transform: scaleX(-1); /* Mirror the video */
         }
+        
+        .camera-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            color: white;
+        }
+        
+        .face-outline {
+            width: 200px;
+            height: 200px;
+            border: 3px dashed rgba(255, 255, 255, 0.7);
+            border-radius: 50%;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .face-outline::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+        }
+        
+        .camera-guide {
+            margin-top: 16px;
+            font-size: 14px;
+            text-align: center;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+        }
+        
         #canvas {
             display: none;
         }
+        
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 12px;
+        }
+        
         .button {
-            padding: 12px 24px;
-            background-color: #3390ec;
+            background-color: var(--primary);
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 12px;
             font-size: 16px;
+            font-weight: 600;
+            padding: 16px;
             cursor: pointer;
-            margin: 10px 0;
-            transition: background-color 0.3s;
+            position: relative;
+            overflow: hidden;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
+        
+        .button:hover {
+            background-color: var(--primary-dark);
+        }
+        
         .button:disabled {
-            background-color: #999;
+            background-color: var(--text-secondary);
+            cursor: not-allowed;
+            opacity: 0.7;
         }
+        
+        .button i {
+            font-size: 18px;
+        }
+        
+        .button-alt {
+            background-color: transparent;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+        }
+        
+        .button-alt:hover {
+            background-color: var(--primary-light);
+        }
+        
         .loading-overlay {
             position: absolute;
             top: 0;
@@ -64,53 +238,87 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-direction: column;
+            gap: 16px;
             color: white;
-            font-size: 18px;
-            display: none;
+            font-size: 16px;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
         }
+        
+        .loading-overlay.show {
+            opacity: 1;
+            pointer-events: all;
+        }
+        
         .spinner {
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top: 4px solid white;
             width: 40px;
             height: 40px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 3px solid white;
             animation: spin 1s linear infinite;
-            margin-right: 10px;
         }
+        
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        .pulsar {
+            width: 16px;
+            height: 16px;
+            background-color: var(--primary);
+            border-radius: 50%;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(51, 144, 236, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(51, 144, 236, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(51, 144, 236, 0); }
+        }
+        
         .status-message {
-            margin: 15px 0;
-            padding: 10px;
-            border-radius: 8px;
+            margin: 16px 0;
+            padding: 14px;
+            border-radius: 12px;
+            text-align: center;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+            gap: 8px;
         }
-        .error {
-            background-color: #ffebee;
-            color: #c62828;
+        
+        .status-message.error {
+            background-color: var(--error-light);
+            color: var(--error);
         }
-        .success {
-            background-color: #e8f5e9;
-            color: #2e7d32;
+        
+        .status-message.success {
+            background-color: var(--success-light);
+            color: var(--success);
         }
+        
+        .status-message.warning {
+            background-color: var(--warning-light);
+            color: var(--warning);
+        }
+        
         .footer {
-            margin-top: 20px;
+            margin-top: auto;
+            text-align: center;
+            color: var(--text-secondary);
             font-size: 12px;
-            color: #777;
-        }
-        #debug-console {
-            width: 100%;
-            height: 150px;
-            overflow-y: auto;
-            background-color: #000;
-            color: #fff;
-            font-family: monospace;
-            padding: 10px;
-            margin-top: 20px;
-            border-radius: 8px;
-            font-size: 12px;
-            text-align: left;
+            padding: 16px 0;
         }
         
         /* Signature Canvas Styles */
@@ -121,76 +329,196 @@
             flex-direction: column;
             align-items: center;
         }
+        
+        .signature-challenge {
+            background-color: var(--primary-light);
+            padding: 14px;
+            border-radius: 12px;
+            width: 100%;
+            margin-bottom: 16px;
+            font-weight: 500;
+            text-align: center;
+            color: var(--primary-dark);
+        }
+        
         #signatureCanvas {
             width: 100%;
             height: 200px;
-            border: 2px solid #ccc;
-            border-radius: 8px;
+            border: 2px dashed var(--border);
+            border-radius: 12px;
             background-color: #fff;
-            margin-bottom: 10px;
+            margin-bottom: 16px;
+            touch-action: none;
         }
+        
         .signature-controls {
             display: flex;
             width: 100%;
             justify-content: space-between;
+            gap: 10px;
         }
+        
         .signature-controls button {
             flex: 1;
-            margin: 0 5px;
         }
-        .signature-challenge {
-            background-color: #e3f2fd;
+        
+        #debug-console {
+            width: 100%;
+            height: 150px;
+            overflow-y: auto;
+            background-color: #1e1e1e;
+            color: #ddd;
+            font-family: 'Courier New', monospace;
             padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            font-weight: bold;
+            margin-top: 20px;
+            border-radius: 12px;
+            font-size: 12px;
+            text-align: left;
+            display: none;
+        }
+        
+        .mode-switch {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background-color: rgba(0, 0, 0, 0.2);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .mode-switch:hover {
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+        
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.6s ease forwards;
+        }
+        
+        .slide-up {
+            animation: slideUp 0.5s ease forwards;
+        }
+        
+        /* Media Queries */
+        @media (max-width: 480px) {
+            .app-container {
+                padding: 16px 12px;
+            }
+            
+            .card {
+                padding: 16px;
+                border-radius: 12px;
+            }
+            
+            .header h1 {
+                font-size: 24px;
+            }
+            
+            .face-outline {
+                width: 160px;
+                height: 160px;
+            }
+            
+            .face-outline::before {
+                width: 140px;
+                height: 140px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Verifikasi Wajah</h1>
-        <p>Silakan tampilkan wajah Anda di depan kamera untuk verifikasi</p>
-
-        <div class="privacy-notice" style="background-color: #e3f2fd; padding: 10px; border-left: 4px solid #2196f3; margin: 15px 0; border-radius: 4px;">
-           <p style="margin: 0; font-size: 14px;"><strong>Privasi Anda Penting:</strong> Gambar wajah Anda hanya digunakan untuk verifikasi saat ini dan <span style="text-decoration: underline;">tidak akan disimpan</span> setelah proses selesai.</p>
+    <div class="app-container">
+        <div class="header slide-up">
+            <h1>Verifikasi Wajah</h1>
+            <p>Silakan tampilkan wajah Anda di depan kamera untuk verifikasi</p>
         </div>
         
-        <div class="camera-container">
-            <video id="video" playsinline autoplay muted></video>
-            <canvas id="canvas"></canvas>
-            <div class="loading-overlay">
-                <div class="spinner"></div>
-                <span>Memverifikasi...</span>
+        <div class="card fade-in">
+            <div class="pulsar"></div>
+            
+            <div class="privacy-notice">
+                <i class="fas fa-shield-alt"></i>
+                <p><strong>Privasi Anda Penting:</strong> Gambar wajah Anda hanya digunakan untuk verifikasi saat ini dan <span style="text-decoration: underline;">tidak akan disimpan</span> setelah proses selesai.</p>
             </div>
+            
+            <div class="camera-container" id="cameraContainer">
+                <video id="video" playsinline autoplay muted></video>
+                <div class="camera-overlay">
+                    <div class="face-outline"></div>
+                    <p class="camera-guide">Posisikan wajah Anda di dalam lingkaran</p>
+                </div>
+                <canvas id="canvas"></canvas>
+                <button class="mode-switch" id="cameraSwitch" title="Switch Camera">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+            
+            <div class="button-group">
+                <button id="verifyBtn" class="button" disabled>
+                    <i class="fas fa-camera"></i>
+                    Verifikasi Wajah
+                </button>
+                <button id="altVerifyBtn" class="button button-alt">
+                    <i class="fas fa-signature"></i>
+                    Verifikasi Tanda Tangan
+                </button>
+            </div>
+            
+            <div id="statusMessage" class="status-message" style="display: none;"></div>
         </div>
-        
-        <button id="verifyBtn" class="button" disabled>Verifikasi Wajah</button>
-        <button id="altVerifyBtn" class="button">Verifikasi Tanda Tangan</button>
-        
-        <div id="statusMessage" class="status-message"></div>
         
         <!-- Signature Verification Container -->
-        <div class="signature-container" id="signatureContainer">
+        <div class="card signature-container" id="signatureContainer">
             <div class="signature-challenge" id="signatureChallenge">
                 Silakan buat tanda tangan Anda:
             </div>
             <canvas id="signatureCanvas"></canvas>
             <div class="signature-controls">
-                <button id="clearSignatureBtn" class="button">Hapus</button>
-                <button id="submitSignatureBtn" class="button">Kirim Tanda Tangan</button>
+                <button id="clearSignatureBtn" class="button button-alt">
+                    <i class="fas fa-eraser"></i>
+                    Hapus
+                </button>
+                <button id="submitSignatureBtn" class="button">
+                    <i class="fas fa-paper-plane"></i>
+                    Kirim Tanda Tangan
+                </button>
             </div>
         </div>
         
         <div id="debug-console"></div>
         
         <div class="footer">
-            @Realsonnet
-            <p style="font-size: 11px; margin-top: 5px;">Verifikasi dilakukan tanpa penyimpanan data.</p>
+            <p>@Realsonnet</p>
+            <p style="margin-top: 5px;">Verifikasi dilakukan tanpa penyimpanan data.</p>
         </div>
+    </div>
+    
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <span id="loadingText">Memverifikasi...</span>
     </div>
 
     <script>
+        // Debug Console Functions
         function debugLog(message, type = 'info') {
             const debugConsole = document.getElementById('debug-console');
             const timestamp = new Date().toLocaleTimeString();
@@ -223,6 +551,7 @@
             console.log(`[${timestamp}] ${message}`);
         }
 
+        // URL Parameters and Storage
         const urlParams = new URLSearchParams(window.location.search);
         const token = urlParams.get('token');
         const chatId = urlParams.get('chatId');
@@ -246,11 +575,7 @@
             debugLog(`Stored token in localStorage: ${token}`, 'success');
         }
         
-        debugLog(`Chat ID from URL: ${chatId || 'Not found'}`);
-        debugLog(`Token from URL: ${token || 'Not found'}`);
-        debugLog(`User ID from URL: ${userIdFromUrl || 'Not found'}`);
-        debugLog(`Full URL: ${window.location.href}`);
-        
+        // Telegram WebApp initialization
         let tg = null;
         let userId = null;
         let initData = '';
@@ -290,6 +615,10 @@
                 }
                 
                 tg.expand();
+                tg.MainButton.setParams({
+                    text: 'Verifikasi',
+                    color: '#3390EC'
+                });
             } catch (e) {
                 debugLog(`Error initializing Telegram WebApp: ${e.message}`, 'error');
             }
@@ -301,12 +630,14 @@
         userId = userId || userIdFromUrl || localStorage.getItem('userId') || '';
         debugLog(`Final userId being used: ${userId || 'Not available'}`, userId ? 'success' : 'warning');
         
+        // DOM Elements
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const verifyBtn = document.getElementById('verifyBtn');
         const altVerifyBtn = document.getElementById('altVerifyBtn');
         const statusMessage = document.getElementById('statusMessage');
-        const loadingOverlay = document.querySelector('.loading-overlay');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const cameraSwitch = document.getElementById('cameraSwitch');
         const ctx = canvas.getContext('2d');
         
         // Signature elements
@@ -317,15 +648,49 @@
         const submitSignatureBtn = document.getElementById('submitSignatureBtn');
         const signatureCtx = signatureCanvas.getContext('2d');
         
+        // Variables
         let stream = null;
         let verificationTimeout = null;
         let cameraStartTimeout = null;
         let isDrawing = false;
         let signatureToken = null;
         let challengeText = null;
+        let facingMode = 'user'; // default front camera
         
-        const TIMEOUT_DURATION = 120000;
-        const CAMERA_START_TIMEOUT = 15000;
+        const TIMEOUT_DURATION = 120000; // 2 minutes
+        const CAMERA_START_TIMEOUT = 15000; // 15 seconds
+        
+        // Helper Functions
+        function showLoading(message = 'Memverifikasi...') {
+            document.getElementById('loadingText').textContent = message;
+            loadingOverlay.classList.add('show');
+        }
+        
+        function hideLoading() {
+            loadingOverlay.classList.remove('show');
+        }
+        
+        function showStatus(message, type = 'normal') {
+            statusMessage.innerHTML = '';
+            
+            // Add icon based on type
+            let icon = '';
+            if (type === 'error') {
+                icon = '<i class="fas fa-exclamation-circle"></i>';
+                statusMessage.className = 'status-message error';
+            } else if (type === 'success') {
+                icon = '<i class="fas fa-check-circle"></i>';
+                statusMessage.className = 'status-message success';
+            } else if (type === 'warning') {
+                icon = '<i class="fas fa-exclamation-triangle"></i>';
+                statusMessage.className = 'status-message warning';
+            } else {
+                statusMessage.className = 'status-message';
+            }
+            
+            statusMessage.innerHTML = icon + message;
+            statusMessage.style.display = 'flex';
+        }
         
         // Setup signature canvas
         function setupSignatureCanvas() {
@@ -371,12 +736,6 @@
                 const mouseEvent = new MouseEvent('mouseup');
                 signatureCanvas.dispatchEvent(mouseEvent);
             });
-            
-            // Clear button
-            clearSignatureBtn.addEventListener('click', clearSignature);
-            
-            // Submit button
-            submitSignatureBtn.addEventListener('click', submitSignature);
         }
         
         function startDrawing(e) {
@@ -417,89 +776,6 @@
             signatureCtx.clearRect(0, 0, signatureCanvas.width, signatureCanvas.height);
         }
         
-        async function submitSignature() {
-            debugLog('Submitting signature verification...');
-            
-            if (isCanvasEmpty()) {
-                showStatus('Silakan buat tanda tangan terlebih dahulu', 'error');
-                return;
-            }
-            
-            submitSignatureBtn.disabled = true;
-            loadingOverlay.style.display = 'flex';
-            
-            try {
-                const signatureImg = signatureCanvas.toDataURL('image/png');
-                
-                const effectiveUserId = userId || userIdFromUrl || localStorage.getItem('userId');
-                let effectiveChatId = chatId || localStorage.getItem('chatId');
-                const effectiveToken = token || localStorage.getItem('token');
-                
-                if (!effectiveUserId) {
-                    debugLog('CRITICAL ERROR: Missing userId for signature verification!', 'error');
-                    showStatus('Error: User ID tidak ditemukan.', 'error');
-                    submitSignatureBtn.disabled = false;
-                    loadingOverlay.style.display = 'none';
-                    return;
-                }
-                
-                if (!signatureToken) {
-                    debugLog('ERROR: Missing signature token!', 'error');
-                    showStatus('Error: Token tanda tangan tidak ditemukan.', 'error');
-                    submitSignatureBtn.disabled = false;
-                    loadingOverlay.style.display = 'none';
-                    return;
-                }
-                
-                const requestData = {
-                    userId: effectiveUserId,
-                    chatId: effectiveChatId,
-                    signatureData: signatureImg,
-                    signatureToken: signatureToken,
-                    initData: initData
-                };
-                
-                const apiUrl = '/api/verify-signature';
-                debugLog(`Sending signature verification to: ${apiUrl}`);
-                
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(requestData)
-                });
-                
-                const result = await response.json();
-                debugLog(`Signature verification response: ${JSON.stringify(result)}`);
-                
-                if (result.success) {
-                    debugLog('Signature verification successful!', 'success');
-                    showStatus('Verifikasi tanda tangan berhasil! Anda sekarang dapat chat di grup.', 'success');
-                    clearTimeout(verificationTimeout);
-                    
-                    // Hide signature container
-                    signatureContainer.style.display = 'none';
-                    
-                    setTimeout(() => {
-                        if (tg) {
-                            tg.close();
-                        }
-                    }, 2000);
-                } else {
-                    debugLog(`Signature verification failed: ${result.message}`, 'error');
-                    showStatus(`Verifikasi gagal: ${result.message}`, 'error');
-                    submitSignatureBtn.disabled = false;
-                }
-            } catch (error) {
-                debugLog(`Error during signature verification: ${error.message}`, 'error');
-                showStatus(`Terjadi kesalahan saat verifikasi tanda tangan: ${error.message}`, 'error');
-                submitSignatureBtn.disabled = false;
-            } finally {
-                loadingOverlay.style.display = 'none';
-            }
-        }
-        
         function isCanvasEmpty() {
             const pixelData = signatureCtx.getImageData(0, 0, signatureCanvas.width, signatureCanvas.height).data;
             
@@ -513,30 +789,37 @@
             return true; // All pixels are transparent
         }
         
+        function startVerificationTimeout() {
+            verificationTimeout = setTimeout(() => {
+                debugLog('Verification timeout reached', 'warning');
+                showStatus('Waktu verifikasi habis. Silakan coba lagi.', 'error');
+                if (tg) {
+                    tg.close();
+                }
+            }, TIMEOUT_DURATION);
+        }
+        
+        // Camera Functions
         async function startCamera() {
             try {
                 debugLog('🔍 URL Parameters Check:');
                 debugLog(`userId from URL: ${userIdFromUrl || 'Not found'}`);
                 debugLog(`chatId from URL: ${chatId || 'Not found'}`);
                 debugLog(`token from URL: ${token || 'Not found'}`);
-                debugLog(`localStorage userId: ${localStorage.getItem('userId') || 'Not found'}`);
-                debugLog(`localStorage chatId: ${localStorage.getItem('chatId') || 'Not found'}`);
-                
-                if (tg && tg.initDataUnsafe) {
-                    debugLog('Telegram WebApp Data:', 'info');
-                    debugLog(`startParam: ${tg.initDataUnsafe.start_param || 'none'}`);
-                    debugLog(`chatInstance: ${tg.initDataUnsafe.chat_instance || 'none'}`);
-                    debugLog(`chatType: ${tg.initDataUnsafe.chat_type || 'none'}`);
-                }
                 
                 debugLog('Requesting camera access...');
                 
                 let constraints = {
                     video: { 
-                        facingMode: 'user'
+                        facingMode: facingMode
                     },
                     audio: false
                 };
+                
+                // If there's an existing stream, stop it
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
                 
                 // Try to get any video first
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -578,322 +861,282 @@
             }
         }
         
-        async function restartCameraWithSpecificConstraints() {
+        async function switchCamera() {
+            facingMode = facingMode === 'user' ? 'environment' : 'user';
+            debugLog(`Switching camera to: ${facingMode}`);
+            
             try {
-                debugLog('Attempting to restart camera with specific constraints');
-                
+                // Stop current stream
                 if (stream) {
                     stream.getTracks().forEach(track => track.stop());
                 }
                 
-                const mobileConstraints = {
+                // Start new stream with different facing mode
+                const constraints = {
+                    video: { facingMode: facingMode },
+                    audio: false
+                };
+                
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                
+                debugLog(`Camera switched to: ${facingMode}`, 'success');
+            } catch (err) {
+                debugLog(`Error switching camera: ${err.message}`, 'error');
+                showStatus('Gagal mengganti kamera.', 'error');
+                
+                // Revert back
+                facingMode = facingMode === 'user' ? 'environment' : 'user';
+                startCamera();
+            }
+        }
+        
+        async function restartCameraWithSpecificConstraints() {
+            try {
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+                
+                // Try with more specific constraints
+                const constraints = {
                     video: {
-                        facingMode: 'user',
-                        width: { ideal: 320 },
-                        height: { ideal: 240 }
+                        facingMode: facingMode,
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
                     },
                     audio: false
                 };
                 
-                stream = await navigator.mediaDevices.getUserMedia(mobileConstraints);
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
-                debugLog('Camera restarted with mobile-optimized settings', 'success');
                 
-                // Force a play attempt
-                try {
-                    await video.play();
-                    debugLog('Video playback forced successfully');
-                } catch (playErr) {
-                    debugLog(`Failed to force video playback: ${playErr.message}`, 'error');
-                }
+                debugLog('Camera restarted with specific constraints', 'success');
             } catch (err) {
                 debugLog(`Failed to restart camera: ${err.message}`, 'error');
-                showStatus('Gagal memulai kamera. Gunakan verifikasi tanda tangan.', 'error');
-                verifyBtn.disabled = true;
+                showStatus('Tidak dapat mengakses kamera dengan benar. Silakan gunakan verifikasi tanda tangan.', 'error');
             }
         }
         
-        function startVerificationTimeout() {
-            verificationTimeout = setTimeout(() => {
-                debugLog('Verification timeout reached', 'warning');
-                showStatus('Waktu verifikasi habis. Silakan coba lagi.', 'error');
-                if (tg) {
-                    tg.close();
-                }
-            }, TIMEOUT_DURATION);
-        }
-        
+        // Face Verification Function
         async function verifyFace() {
-            if (!stream) {
-                debugLog('No camera stream available', 'error');
-                showStatus('Kamera tidak tersedia', 'error');
-                return;
-            }
-            
-            debugLog('Taking photo and sending verification request...');
-            loadingOverlay.style.display = 'flex';
-            verifyBtn.disabled = true;
-            
             try {
-                const videoWidth = video.videoWidth || 640;
-                const videoHeight = video.videoHeight || 480;
-                
-                canvas.width = videoWidth;
-                canvas.height = videoHeight;
-                ctx.drawImage(video, 0, 0, videoWidth, videoHeight);
-                
-                const imageData = canvas.toDataURL('image/jpeg', 0.8);
-                debugLog(`Image captured successfully (${Math.round(imageData.length / 1024)}KB)`);
-                
-                // Get information from various sources and use fallbacks
-                const effectiveUserId = userId || userIdFromUrl || localStorage.getItem('userId');
-                let effectiveChatId = chatId || localStorage.getItem('chatId');
-                const effectiveToken = token || localStorage.getItem('token');
-                
-                // Check if we have an effectiveToken and if not, try to get chat ID from the verification token
-                if (effectiveToken && !effectiveChatId) {
-                    // If we have a token but no chatId, we need to make a request to get the chatId associated with this token
-                    try {
-                        // Try to get chat ID via the token
-                        const tokenCheckUrl = '/api/token-info';
-                        const tokenResponse = await fetch(tokenCheckUrl, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ token: effectiveToken })
-                        });
-                        
-                        if (tokenResponse.ok) {
-                            const tokenData = await tokenResponse.json();
-                            if (tokenData.success && tokenData.chatId) {
-                                effectiveChatId = tokenData.chatId;
-                                localStorage.setItem('chatId', effectiveChatId);
-                                debugLog(`Retrieved chatId from token: ${effectiveChatId}`, 'success');
-                            }
-                        }
-                    } catch (tokenError) {
-                        debugLog(`Error retrieving chatId from token: ${tokenError.message}`, 'error');
-                    }
-                }
-                
-                debugLog(`Sending verification with userId: ${effectiveUserId}, chatId: ${effectiveChatId}`);
-                
-                if (!effectiveUserId) {
-                    debugLog('CRITICAL ERROR: Missing userId for verification!', 'error');
-                    showStatus('Error: User ID tidak ditemukan. Coba gunakan verifikasi tanda tangan.', 'error');
-                    loadingOverlay.style.display = 'none';
-                    verifyBtn.disabled = false;
+                if (!stream) {
+                    showStatus('Kamera tidak tersedia.', 'error');
                     return;
                 }
                 
-                if (!effectiveChatId) {
-                    debugLog('WARNING: chatId not found, attempting to proceed with verification anyway', 'warning');
-                    showStatus('Peringatan: Chat ID tidak ditemukan. Mencoba melanjutkan verifikasi...', 'warning');
-                }
-
-                debugLog(`Final values before sending: userId=${effectiveUserId}, chatId=${effectiveChatId}, token=${effectiveToken}`);
+                showLoading('Memproses...');
                 
-                const requestData = {
+                // Set canvas size to match video
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                
+                // Draw video frame to canvas
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Get image data from canvas
+                const imageData = canvas.toDataURL('image/jpeg', 0.9);
+                
+                debugLog('Image captured, sending for verification...');
+                
+                // Send image data to server
+                const verificationData = {
                     image: imageData,
-                    userId: effectiveUserId,
-                    chatId: effectiveChatId,
-                    initData: initData,
-                    token: effectiveToken
+                    userId: userId,
+                    chatId: chatId || localStorage.getItem('chatId'),
+                    token: token || localStorage.getItem('token'),
+                    initData: initData
                 };
                 
-                const apiUrl = '/api/verify';
-                debugLog(`Sending verification to: ${apiUrl}`);
-                debugLog(`Request data keys: ${Object.keys(requestData).join(', ')}`);
-
-                const response = await fetch(apiUrl, {
+                // Perform verification API call
+                const response = await fetch('/api/verify', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(requestData)
+                    body: JSON.stringify(verificationData)
                 });
                 
                 const result = await response.json();
-                debugLog(`Verification response: ${JSON.stringify(result)}`);
+                debugLog(`Verification result: ${JSON.stringify(result)}`);
                 
                 if (result.success) {
-                    debugLog('Verification successful!', 'success');
-                    showStatus('Verifikasi berhasil! Anda sekarang dapat chat di grup.', 'success');
-                    clearTimeout(verificationTimeout);
+                    showStatus(result.message || 'Verifikasi berhasil!', 'success');
                     
+                    // Close Telegram WebApp after delay
                     setTimeout(() => {
                         if (tg) {
                             tg.close();
                         }
-                    }, 2000);
+                    }, 3000);
                 } else {
-                    debugLog(`Verification failed: ${result.message}`, 'error');
-                    showStatus(`Verifikasi gagal: ${result.message}`, 'error');
-                    verifyBtn.disabled = false;
+                    showStatus(result.message || 'Verifikasi gagal, silakan coba lagi.', 'error');
                 }
             } catch (error) {
                 debugLog(`Error during verification: ${error.message}`, 'error');
-                showStatus(`Terjadi kesalahan saat verifikasi: ${error.message}`, 'error');
-                verifyBtn.disabled = false;
+                showStatus('Terjadi kesalahan saat verifikasi. Silakan coba lagi.', 'error');
             } finally {
-                loadingOverlay.style.display = 'none';
+                hideLoading();
             }
         }
         
-        async function alternativeVerification() {
-            debugLog('Starting signature verification...');
-            
+        // Signature verification functions
+        async function requestSignatureVerification() {
             try {
-                const effectiveUserId = userId || userIdFromUrl || localStorage.getItem('userId');
-                let effectiveChatId = chatId || localStorage.getItem('chatId');
-                const effectiveToken = token || localStorage.getItem('token');
+                showLoading('Mempersiapkan verifikasi tanda tangan...');
                 
-                // Similar token-based chatId retrieval for alternative verification
-                if (effectiveToken && !effectiveChatId) {
-                    try {
-                        const tokenCheckUrl = '/api/token-info';
-                        const tokenResponse = await fetch(tokenCheckUrl, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ token: effectiveToken })
-                        });
-                        
-                        if (tokenResponse.ok) {
-                            const tokenData = await tokenResponse.json();
-                            if (tokenData.success && tokenData.chatId) {
-                                effectiveChatId = tokenData.chatId;
-                                localStorage.setItem('chatId', effectiveChatId);
-                                debugLog(`Retrieved chatId from token: ${effectiveChatId}`, 'success');
-                            }
-                        }
-                    } catch (tokenError) {
-                        debugLog(`Error retrieving chatId from token: ${tokenError.message}`, 'error');
-                    }
-                }
-                
-                debugLog(`Signature verification with userId: ${effectiveUserId}, chatId: ${effectiveChatId}`);
-                
-                if (!effectiveUserId) {
-                    debugLog('CRITICAL ERROR: Missing userId for signature verification!', 'error');
-                    showStatus('Error: User ID tidak ditemukan.', 'error');
-                    return;
-                }
-                
-                const requestData = {
-                    userId: effectiveUserId,
-                    chatId: effectiveChatId,
-                    initData: initData,
-                    token: effectiveToken
+                const verificationData = {
+                    userId: userId,
+                    chatId: chatId || localStorage.getItem('chatId'),
+                    token: token || localStorage.getItem('token'),
+                    initData: initData
                 };
                 
-                const apiUrl = '/api/alt-verify';
-                debugLog(`Requesting signature challenge: ${apiUrl}`);
-                
-                // Show loading overlay while fetching
-                loadingOverlay.style.display = 'flex';
-                altVerifyBtn.disabled = true;
-                
-                const response = await fetch(apiUrl, {
+                // Request signature challenge from server
+                const response = await fetch('/api/alt-verify', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(requestData)
+                    body: JSON.stringify(verificationData)
                 });
                 
                 const result = await response.json();
-                debugLog(`Signature challenge response: ${JSON.stringify(result)}`);
+                debugLog(`Signature challenge result: ${JSON.stringify(result)}`);
                 
                 if (result.success) {
-                    debugLog('Got signature challenge successfully', 'success');
-                    
-                    // Hide camera container and show signature container
-                    document.querySelector('.camera-container').style.display = 'none';
-                    signatureContainer.style.display = 'flex';
-                    verifyBtn.style.display = 'none';
-                    altVerifyBtn.style.display = 'none';
-                    
-                    // Set challenge text
-                    signatureChallenge.innerText = `Silakan buat tanda tangan Anda untuk verifikasi:`;
-                    
-                    // Store signature token for submission
+                    // Store signature token and challenge
                     signatureToken = result.signatureToken;
                     challengeText = result.challenge;
                     
+                    // Show signature challenge 
+                    signatureChallenge.textContent = `Silakan buat tanda tangan Anda:`;
+                    
+                    // Hide camera container and show signature container
+                    document.getElementById('cameraContainer').style.display = 'none';
+                    signatureContainer.style.display = 'flex';
+                    document.querySelectorAll('.button-group')[0].style.display = 'none';
+                    
                     // Setup signature canvas
                     setupSignatureCanvas();
-                    
-                    showStatus('Silakan buat tanda tangan Anda di area yang disediakan.', 'normal');
                 } else {
-                    debugLog(`Failed to get signature challenge: ${result.message}`, 'error');
-                    showStatus(`Gagal memulai verifikasi tanda tangan: ${result.message}`, 'error');
+                    showStatus(result.message || 'Gagal mempersiapkan verifikasi tanda tangan.', 'error');
                 }
             } catch (error) {
-                debugLog(`Error during alt verification: ${error.message}`, 'error');
-                showStatus(`Terjadi kesalahan saat memulai verifikasi alternatif: ${error.message}`, 'error');
+                debugLog(`Error requesting signature verification: ${error.message}`, 'error');
+                showStatus('Terjadi kesalahan saat mempersiapkan verifikasi tanda tangan.', 'error');
             } finally {
-                loadingOverlay.style.display = 'none';
-                altVerifyBtn.disabled = false;
+                hideLoading();
             }
         }
         
-        function showStatus(message, type = 'normal') {
-            statusMessage.textContent = message;
-            statusMessage.className = 'status-message';
-            
-            if (type === 'error') {
-                statusMessage.classList.add('error');
-            } else if (type === 'success') {
-                statusMessage.classList.add('success');
+        async function submitSignature() {
+            try {
+                if (isCanvasEmpty()) {
+                    showStatus('Silakan buat tanda tangan terlebih dahulu.', 'warning');
+                    return;
+                }
+                
+                showLoading('Mengirim tanda tangan...');
+                
+                // Get image data from signature canvas
+                const signatureData = signatureCanvas.toDataURL('image/png');
+                
+                const verificationData = {
+                    userId: userId,
+                    chatId: chatId || localStorage.getItem('chatId'),
+                    signatureData: signatureData,
+                    signatureToken: signatureToken,
+                    initData: initData
+                };
+                
+                // Submit signature for verification
+                const response = await fetch('/api/verify-signature', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(verificationData)
+                });
+                
+                const result = await response.json();
+                debugLog(`Signature verification result: ${JSON.stringify(result)}`);
+                
+                if (result.success) {
+                    showStatus(result.message || 'Verifikasi tanda tangan berhasil!', 'success');
+                    
+                    // Close Telegram WebApp after delay
+                    setTimeout(() => {
+                        if (tg) {
+                            tg.close();
+                        }
+                    }, 3000);
+                } else {
+                    showStatus(result.message || 'Verifikasi tanda tangan gagal.', 'error');
+                }
+            } catch (error) {
+                debugLog(`Error submitting signature: ${error.message}`, 'error');
+                showStatus('Terjadi kesalahan saat mengirim tanda tangan.', 'error');
+            } finally {
+                hideLoading();
             }
         }
         
-        // Event listeners
+        // Event Listeners
         verifyBtn.addEventListener('click', verifyFace);
-        altVerifyBtn.addEventListener('click', alternativeVerification);
+        cameraSwitch.addEventListener('click', switchCamera);
+        altVerifyBtn.addEventListener('click', requestSignatureVerification);
+        clearSignatureBtn.addEventListener('click', clearSignature);
+        submitSignatureBtn.addEventListener('click', submitSignature);
         
-        // Start camera when page loads
-        window.addEventListener('DOMContentLoaded', () => {
-            debugLog('DOM content loaded');
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            debugLog('DOMContentLoaded, starting initialization');
             
-            // Initialize canvas for signature if window loaded
-            signatureCanvas.width = signatureCanvas.offsetWidth;
-            signatureCanvas.height = signatureCanvas.offsetHeight;
-            
-            // Start camera
             startCamera();
-        });
-        
-        // Handle window resize for signature canvas
-        window.addEventListener('resize', () => {
-            if (signatureContainer.style.display === 'flex') {
-                // Resize signature canvas
-                const oldData = signatureCtx.getImageData(0, 0, signatureCanvas.width, signatureCanvas.height);
-                
-                // Save current drawing
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = signatureCanvas.width;
-                tempCanvas.height = signatureCanvas.height;
-                const tempCtx = tempCanvas.getContext('2d');
-                tempCtx.putImageData(oldData, 0, 0);
-                
-                // Resize canvas
-                signatureCanvas.width = signatureCanvas.offsetWidth;
-                signatureCanvas.height = signatureCanvas.offsetHeight;
-                
-                // Restore drawing
-                signatureCtx.drawImage(tempCanvas, 0, 0, signatureCanvas.width, signatureCanvas.height);
-                
-                // Reset stroke style
-                signatureCtx.lineWidth = 3;
-                signatureCtx.lineJoin = 'round';
-                signatureCtx.lineCap = 'round';
-                signatureCtx.strokeStyle = '#000';
+            
+            debugLog('Camera initialization has been requested');
+            
+            // Check if debug should be shown
+            if (urlParams.get('debug') === 'true') {
+                document.getElementById('debug-console').style.display = 'block';
+                debugLog('Debug mode enabled', 'success');
             }
         });
+        
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                // Restart camera when page becomes visible again
+                debugLog('Page became visible, restarting camera');
+                if (!stream || stream.getTracks()[0].readyState === 'ended') {
+                    startCamera();
+                }
+            }
+        });
+        
+        // Check for camera permission status
+        if (navigator.permissions && navigator.permissions.query) {
+            navigator.permissions.query({ name: 'camera' })
+            .then((permissionStatus) => {
+                debugLog(`Camera permission status: ${permissionStatus.state}`);
+                
+                if (permissionStatus.state === 'denied') {
+                    showStatus('Akses kamera ditolak. Silakan aktifkan kamera atau gunakan verifikasi tanda tangan.', 'error');
+                    verifyBtn.disabled = true;
+                }
+                
+                permissionStatus.onchange = function() {
+                    debugLog(`Camera permission status changed to: ${this.state}`);
+                    if (this.state === 'granted') {
+                        startCamera();
+                    } else if (this.state === 'denied') {
+                        showStatus('Akses kamera ditolak. Silakan aktifkan kamera atau gunakan verifikasi tanda tangan.', 'error');
+                        verifyBtn.disabled = true;
+                    }
+                };
+            });
+        }
     </script>
 </body>
 </html>
