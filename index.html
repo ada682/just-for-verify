@@ -124,7 +124,7 @@
         </div>
         
         <div class="camera-container">
-            <video id="video" playsinline autoplay></video>
+            <video id="video" playsinline autoplay muted></video>
             <canvas id="canvas"></canvas>
             <div class="loading-overlay">
                 <div class="spinner"></div>
@@ -146,7 +146,6 @@
     </div>
 
     <script>
-        // Debug logging function
         function debugLog(message, type = 'info') {
             const debugConsole = document.getElementById('debug-console');
             const timestamp = new Date().toLocaleTimeString();
@@ -179,13 +178,11 @@
             console.log(`[${timestamp}] ${message}`);
         }
 
-        // Get URL parameters
         const urlParams = new URLSearchParams(window.location.search);
         const token = urlParams.get('token');
         const chatId = urlParams.get('chatId');
         const userIdFromUrl = urlParams.get('userId');
         
-        // Store parameters in localStorage as backup
         if (userIdFromUrl) {
             localStorage.setItem('userId', userIdFromUrl);
             debugLog(`Stored userId in localStorage: ${userIdFromUrl}`, 'success');
@@ -206,7 +203,6 @@
         debugLog(`User ID from URL: ${userIdFromUrl || 'Not found'}`);
         debugLog(`Full URL: ${window.location.href}`);
         
-        // Check if Telegram WebApp is available
         let tg = null;
         let userId = null;
         let initData = '';
@@ -218,11 +214,9 @@
                 debugLog(`WebApp version: ${tg.version}`);
                 debugLog(`Platform: ${tg.platform}`);
                 
-                // Try to get initData
                 initData = tg.initData || '';
                 debugLog(`Init data length: ${initData.length} characters`);
                 
-                // Get user info if available
                 if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
                     userId = tg.initDataUnsafe.user.id;
                     debugLog(`User ID from Telegram: ${userId}`, 'success');
@@ -231,7 +225,6 @@
                         username: tg.initDataUnsafe.user.username || 'None'
                     })}`);
                     
-                    // Store in localStorage
                     localStorage.setItem('userId', userId);
                 } else {
                     debugLog(`No user data in initDataUnsafe`, 'warning');
@@ -248,7 +241,6 @@
                     }
                 }
                 
-                // Expand the WebApp
                 tg.expand();
             } catch (e) {
                 debugLog(`Error initializing Telegram WebApp: ${e.message}`, 'error');
@@ -258,7 +250,6 @@
             debugLog(`WARNING: Telegram WebApp is not available!`, 'warning');
         }
         
-        // Fallback - get userId from URL if not available from Telegram
         userId = userId || userIdFromUrl || localStorage.getItem('userId') || '';
         debugLog(`Final userId being used: ${userId || 'Not available'}`, userId ? 'success' : 'warning');
         
@@ -272,12 +263,12 @@
         
         let stream = null;
         let verificationTimeout = null;
-        const TIMEOUT_DURATION = 120000; // 2 minutes
+        let cameraStartTimeout = null;
+        const TIMEOUT_DURATION = 120000;
+        const CAMERA_START_TIMEOUT = 15000;
         
-        // Function to start camera
         async function startCamera() {
             try {
-                // Enhanced URL parameter logging
                 debugLog('🔍 URL Parameters Check:');
                 debugLog(`userId from URL: ${userIdFromUrl || 'Not found'}`);
                 debugLog(`chatId from URL: ${chatId || 'Not found'}`);
@@ -285,7 +276,6 @@
                 debugLog(`localStorage userId: ${localStorage.getItem('userId') || 'Not found'}`);
                 debugLog(`localStorage chatId: ${localStorage.getItem('chatId') || 'Not found'}`);
                 
-                // Check Telegram WebApp data again
                 if (tg && tg.initDataUnsafe) {
                     debugLog('Telegram WebApp Data:', 'info');
                     debugLog(`startParam: ${tg.initDataUnsafe.start_param || 'none'}`);
@@ -295,24 +285,34 @@
                 
                 debugLog('Requesting camera access...');
                 
-                stream = await navigator.mediaDevices.getUserMedia({
+                let constraints = {
                     video: { 
-                        facingMode: 'user',
-                        width: { ideal: 640 },
-                        height: { ideal: 480 }
-                    }
-                });
+                        facingMode: 'user'
+                    },
+                    audio: false
+                };
                 
+                // Try to get any video first
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
                 debugLog('Camera access granted!', 'success');
                 video.srcObject = stream;
                 
-                // Check if video is playing and has dimensions
+                // Set a timeout for camera initialization
+                cameraStartTimeout = setTimeout(() => {
+                    if (!video.videoWidth || !video.videoHeight) {
+                        debugLog('Camera stream not showing, attempting to recover...', 'warning');
+                        
+                        // Try with more specific constraints
+                        restartCameraWithSpecificConstraints();
+                    }
+                }, CAMERA_START_TIMEOUT);
+                
                 video.onloadedmetadata = () => {
                     debugLog(`Video metadata loaded`);
-                    verifyBtn.disabled = false;
                 };
                 
                 video.onplaying = () => {
+                    clearTimeout(cameraStartTimeout);
                     debugLog(`Video is playing, dimensions: ${video.videoWidth} x ${video.videoHeight}`);
                     if (video.videoWidth && video.videoHeight) {
                         verifyBtn.disabled = false;
@@ -320,15 +320,53 @@
                     }
                 };
                 
-                // Start verification timeout
                 startVerificationTimeout();
             } catch (err) {
                 debugLog(`Error accessing camera: ${err.name} - ${err.message}`, 'error');
                 showStatus(`Tidak dapat mengakses kamera: ${err.message}. Silakan gunakan verifikasi alternatif.`, 'error');
+                
+                // If permission denied or device not found, offer alternative verification
+                if (err.name === 'NotAllowedError' || err.name === 'NotFoundError') {
+                    verifyBtn.disabled = true;
+                }
             }
         }
         
-        // Function for verification timeout
+        async function restartCameraWithSpecificConstraints() {
+            try {
+                debugLog('Attempting to restart camera with specific constraints');
+                
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+                
+                const mobileConstraints = {
+                    video: {
+                        facingMode: 'user',
+                        width: { ideal: 320 },
+                        height: { ideal: 240 }
+                    },
+                    audio: false
+                };
+                
+                stream = await navigator.mediaDevices.getUserMedia(mobileConstraints);
+                video.srcObject = stream;
+                debugLog('Camera restarted with mobile-optimized settings', 'success');
+                
+                // Force a play attempt
+                try {
+                    await video.play();
+                    debugLog('Video playback forced successfully');
+                } catch (playErr) {
+                    debugLog(`Failed to force video playback: ${playErr.message}`, 'error');
+                }
+            } catch (err) {
+                debugLog(`Failed to restart camera: ${err.message}`, 'error');
+                showStatus('Gagal memulai kamera. Gunakan verifikasi alternatif.', 'error');
+                verifyBtn.disabled = true;
+            }
+        }
+        
         function startVerificationTimeout() {
             verificationTimeout = setTimeout(() => {
                 debugLog('Verification timeout reached', 'warning');
@@ -339,7 +377,6 @@
             }, TIMEOUT_DURATION);
         }
         
-        // Function to verify face
         async function verifyFace() {
             if (!stream) {
                 debugLog('No camera stream available', 'error');
@@ -352,7 +389,6 @@
             verifyBtn.disabled = true;
             
             try {
-                // Capture image from video
                 const videoWidth = video.videoWidth || 640;
                 const videoHeight = video.videoHeight || 480;
                 
@@ -360,16 +396,13 @@
                 canvas.height = videoHeight;
                 ctx.drawImage(video, 0, 0, videoWidth, videoHeight);
                 
-                // Convert to base64
                 const imageData = canvas.toDataURL('image/jpeg', 0.8);
                 debugLog(`Image captured successfully (${Math.round(imageData.length / 1024)}KB)`);
                 
-                // Get parameters with fallbacks
                 const effectiveUserId = userId || userIdFromUrl || localStorage.getItem('userId');
                 const effectiveChatId = chatId || localStorage.getItem('chatId');
                 const effectiveToken = token || localStorage.getItem('token');
                 
-                // Log what we're actually sending
                 debugLog(`Sending verification with userId: ${effectiveUserId}, chatId: ${effectiveChatId}`);
                 
                 if (!effectiveUserId || !effectiveChatId) {
@@ -382,7 +415,6 @@
                     return;
                 }
                 
-                // Create request data
                 const requestData = {
                     image: imageData,
                     userId: effectiveUserId,
@@ -391,13 +423,10 @@
                     token: effectiveToken
                 };
                 
-                // Try HTTP instead of HTTPS if we're on Vercel (which is already HTTPS)
-                // This helps avoid mixed content issues
                 const apiUrl = '/api/verify';
                 debugLog(`Sending verification to: ${apiUrl}`);
                 debugLog(`Request data keys: ${Object.keys(requestData).join(', ')}`);
 
-                // Send data to backend for verification
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: {
@@ -433,12 +462,10 @@
             }
         }
         
-        // Function for alternative verification
         async function alternativeVerification() {
             debugLog('Starting alternative verification...');
             
             try {
-                // Get parameters with fallbacks
                 const effectiveUserId = userId || userIdFromUrl || localStorage.getItem('userId');
                 const effectiveChatId = chatId || localStorage.getItem('chatId');
                 const effectiveToken = token || localStorage.getItem('token');
@@ -451,7 +478,6 @@
                     return;
                 }
                 
-                // Create request data
                 const requestData = {
                     userId: effectiveUserId,
                     chatId: effectiveChatId,
@@ -459,7 +485,6 @@
                     token: effectiveToken
                 };
                 
-                // Use HTTP API URL
                 const apiUrl = '/api/alt-verify';
                 debugLog(`Sending alt verification request to: ${apiUrl}`);
                 debugLog(`Request data keys: ${Object.keys(requestData).join(', ')}`);
@@ -547,20 +572,50 @@
             debugLog(`Status: ${type} - ${message}`);
         }
         
-        // Add event listeners
         verifyBtn.addEventListener('click', verifyFace);
         altVerifyBtn.addEventListener('click', alternativeVerification);
         
-        // Start on page load
+        // Handle visibility change to detect when the app goes to background
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible') {
+                // App comes back to foreground
+                debugLog('App came back to foreground, checking camera status');
+                
+                // Check if video is still active
+                if (stream && !stream.active) {
+                    debugLog('Camera stream inactive after visibility change, attempting restart', 'warning');
+                    await startCamera();
+                }
+            }
+        });
+        
+        // Handle device orientation change
+        window.addEventListener('orientationchange', async () => {
+            debugLog('Device orientation changed');
+            
+            // Small delay to allow orientation to complete
+            setTimeout(async () => {
+                // Check if video dimensions need to be updated
+                if (stream && stream.active) {
+                    debugLog('Adjusting video after orientation change');
+                    // Force a layout recalculation
+                    video.style.width = '99%';
+                    setTimeout(() => {
+                        video.style.width = '100%';
+                    }, 100);
+                }
+            }, 500);
+        });
+        
         debugLog('DOM loaded, starting camera...');
         startCamera();
         
-        // Clean up on page close
         window.addEventListener('beforeunload', () => {
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
             }
             clearTimeout(verificationTimeout);
+            clearTimeout(cameraStartTimeout);
         });
     </script>
 </body>
