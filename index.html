@@ -112,6 +112,39 @@
             font-size: 12px;
             text-align: left;
         }
+        
+        /* Signature Canvas Styles */
+        .signature-container {
+            width: 100%;
+            margin: 20px 0;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+        }
+        #signatureCanvas {
+            width: 100%;
+            height: 200px;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            background-color: #fff;
+            margin-bottom: 10px;
+        }
+        .signature-controls {
+            display: flex;
+            width: 100%;
+            justify-content: space-between;
+        }
+        .signature-controls button {
+            flex: 1;
+            margin: 0 5px;
+        }
+        .signature-challenge {
+            background-color: #e3f2fd;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -133,15 +166,27 @@
         </div>
         
         <button id="verifyBtn" class="button" disabled>Verifikasi Wajah</button>
-        <button id="altVerifyBtn" class="button">Verifikasi Alternatif</button>
+        <button id="altVerifyBtn" class="button">Verifikasi Tanda Tangan</button>
         
         <div id="statusMessage" class="status-message"></div>
+        
+        <!-- Signature Verification Container -->
+        <div class="signature-container" id="signatureContainer">
+            <div class="signature-challenge" id="signatureChallenge">
+                Silakan buat tanda tangan Anda:
+            </div>
+            <canvas id="signatureCanvas"></canvas>
+            <div class="signature-controls">
+                <button id="clearSignatureBtn" class="button">Hapus</button>
+                <button id="submitSignatureBtn" class="button">Kirim Tanda Tangan</button>
+            </div>
+        </div>
         
         <div id="debug-console"></div>
         
         <div class="footer">
             @Realsonnet
-            <p style="font-size: 11px; margin-top: 5px;">Verifikasi wajah dilakukan tanpa penyimpanan data.</p>
+            <p style="font-size: 11px; margin-top: 5px;">Verifikasi dilakukan tanpa penyimpanan data.</p>
         </div>
     </div>
 
@@ -264,11 +309,209 @@
         const loadingOverlay = document.querySelector('.loading-overlay');
         const ctx = canvas.getContext('2d');
         
+        // Signature elements
+        const signatureContainer = document.getElementById('signatureContainer');
+        const signatureCanvas = document.getElementById('signatureCanvas');
+        const signatureChallenge = document.getElementById('signatureChallenge');
+        const clearSignatureBtn = document.getElementById('clearSignatureBtn');
+        const submitSignatureBtn = document.getElementById('submitSignatureBtn');
+        const signatureCtx = signatureCanvas.getContext('2d');
+        
         let stream = null;
         let verificationTimeout = null;
         let cameraStartTimeout = null;
+        let isDrawing = false;
+        let signatureToken = null;
+        let challengeText = null;
+        
         const TIMEOUT_DURATION = 120000;
         const CAMERA_START_TIMEOUT = 15000;
+        
+        // Setup signature canvas
+        function setupSignatureCanvas() {
+            // Set canvas size
+            signatureCanvas.width = signatureCanvas.offsetWidth;
+            signatureCanvas.height = signatureCanvas.offsetHeight;
+            
+            // Initialize signature canvas
+            signatureCtx.lineWidth = 3;
+            signatureCtx.lineJoin = 'round';
+            signatureCtx.lineCap = 'round';
+            signatureCtx.strokeStyle = '#000';
+            
+            // Mouse events
+            signatureCanvas.addEventListener('mousedown', startDrawing);
+            signatureCanvas.addEventListener('mousemove', draw);
+            signatureCanvas.addEventListener('mouseup', stopDrawing);
+            signatureCanvas.addEventListener('mouseout', stopDrawing);
+            
+            // Touch events
+            signatureCanvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const mouseEvent = new MouseEvent('mousedown', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                });
+                signatureCanvas.dispatchEvent(mouseEvent);
+            });
+            
+            signatureCanvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const mouseEvent = new MouseEvent('mousemove', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                });
+                signatureCanvas.dispatchEvent(mouseEvent);
+            });
+            
+            signatureCanvas.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                const mouseEvent = new MouseEvent('mouseup');
+                signatureCanvas.dispatchEvent(mouseEvent);
+            });
+            
+            // Clear button
+            clearSignatureBtn.addEventListener('click', clearSignature);
+            
+            // Submit button
+            submitSignatureBtn.addEventListener('click', submitSignature);
+        }
+        
+        function startDrawing(e) {
+            isDrawing = true;
+            const { offsetX, offsetY } = getCoordinates(e);
+            signatureCtx.beginPath();
+            signatureCtx.moveTo(offsetX, offsetY);
+        }
+        
+        function draw(e) {
+            if (!isDrawing) return;
+            const { offsetX, offsetY } = getCoordinates(e);
+            signatureCtx.lineTo(offsetX, offsetY);
+            signatureCtx.stroke();
+        }
+        
+        function stopDrawing() {
+            isDrawing = false;
+        }
+        
+        function getCoordinates(e) {
+            let offsetX, offsetY;
+            const rect = signatureCanvas.getBoundingClientRect();
+            
+            // Handle both mouse and touch events
+            if (e.type.includes('touch')) {
+                offsetX = e.touches[0].clientX - rect.left;
+                offsetY = e.touches[0].clientY - rect.top;
+            } else {
+                offsetX = e.clientX - rect.left;
+                offsetY = e.clientY - rect.top;
+            }
+            
+            return { offsetX, offsetY };
+        }
+        
+        function clearSignature() {
+            signatureCtx.clearRect(0, 0, signatureCanvas.width, signatureCanvas.height);
+        }
+        
+        async function submitSignature() {
+            debugLog('Submitting signature verification...');
+            
+            if (isCanvasEmpty()) {
+                showStatus('Silakan buat tanda tangan terlebih dahulu', 'error');
+                return;
+            }
+            
+            submitSignatureBtn.disabled = true;
+            loadingOverlay.style.display = 'flex';
+            
+            try {
+                const signatureImg = signatureCanvas.toDataURL('image/png');
+                
+                const effectiveUserId = userId || userIdFromUrl || localStorage.getItem('userId');
+                let effectiveChatId = chatId || localStorage.getItem('chatId');
+                const effectiveToken = token || localStorage.getItem('token');
+                
+                if (!effectiveUserId) {
+                    debugLog('CRITICAL ERROR: Missing userId for signature verification!', 'error');
+                    showStatus('Error: User ID tidak ditemukan.', 'error');
+                    submitSignatureBtn.disabled = false;
+                    loadingOverlay.style.display = 'none';
+                    return;
+                }
+                
+                if (!signatureToken) {
+                    debugLog('ERROR: Missing signature token!', 'error');
+                    showStatus('Error: Token tanda tangan tidak ditemukan.', 'error');
+                    submitSignatureBtn.disabled = false;
+                    loadingOverlay.style.display = 'none';
+                    return;
+                }
+                
+                const requestData = {
+                    userId: effectiveUserId,
+                    chatId: effectiveChatId,
+                    signatureData: signatureImg,
+                    signatureToken: signatureToken,
+                    initData: initData
+                };
+                
+                const apiUrl = '/api/verify-signature';
+                debugLog(`Sending signature verification to: ${apiUrl}`);
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const result = await response.json();
+                debugLog(`Signature verification response: ${JSON.stringify(result)}`);
+                
+                if (result.success) {
+                    debugLog('Signature verification successful!', 'success');
+                    showStatus('Verifikasi tanda tangan berhasil! Anda sekarang dapat chat di grup.', 'success');
+                    clearTimeout(verificationTimeout);
+                    
+                    // Hide signature container
+                    signatureContainer.style.display = 'none';
+                    
+                    setTimeout(() => {
+                        if (tg) {
+                            tg.close();
+                        }
+                    }, 2000);
+                } else {
+                    debugLog(`Signature verification failed: ${result.message}`, 'error');
+                    showStatus(`Verifikasi gagal: ${result.message}`, 'error');
+                    submitSignatureBtn.disabled = false;
+                }
+            } catch (error) {
+                debugLog(`Error during signature verification: ${error.message}`, 'error');
+                showStatus(`Terjadi kesalahan saat verifikasi tanda tangan: ${error.message}`, 'error');
+                submitSignatureBtn.disabled = false;
+            } finally {
+                loadingOverlay.style.display = 'none';
+            }
+        }
+        
+        function isCanvasEmpty() {
+            const pixelData = signatureCtx.getImageData(0, 0, signatureCanvas.width, signatureCanvas.height).data;
+            
+            // Check if all pixel data is empty (transparent)
+            for (let i = 0; i < pixelData.length; i += 4) {
+                if (pixelData[i + 3] !== 0) {
+                    return false; // Found a non-transparent pixel
+                }
+            }
+            
+            return true; // All pixels are transparent
+        }
         
         async function startCamera() {
             try {
@@ -326,7 +569,7 @@
                 startVerificationTimeout();
             } catch (err) {
                 debugLog(`Error accessing camera: ${err.name} - ${err.message}`, 'error');
-                showStatus(`Tidak dapat mengakses kamera: ${err.message}. Silakan gunakan verifikasi alternatif.`, 'error');
+                showStatus(`Tidak dapat mengakses kamera: ${err.message}. Silakan gunakan verifikasi tanda tangan.`, 'error');
                 
                 // If permission denied or device not found, offer alternative verification
                 if (err.name === 'NotAllowedError' || err.name === 'NotFoundError') {
@@ -365,7 +608,7 @@
                 }
             } catch (err) {
                 debugLog(`Failed to restart camera: ${err.message}`, 'error');
-                showStatus('Gagal memulai kamera. Gunakan verifikasi alternatif.', 'error');
+                showStatus('Gagal memulai kamera. Gunakan verifikasi tanda tangan.', 'error');
                 verifyBtn.disabled = true;
             }
         }
@@ -438,7 +681,7 @@
                 
                 if (!effectiveUserId) {
                     debugLog('CRITICAL ERROR: Missing userId for verification!', 'error');
-                    showStatus('Error: User ID tidak ditemukan. Coba gunakan verifikasi alternatif.', 'error');
+                    showStatus('Error: User ID tidak ditemukan. Coba gunakan verifikasi tanda tangan.', 'error');
                     loadingOverlay.style.display = 'none';
                     verifyBtn.disabled = false;
                     return;
@@ -499,7 +742,7 @@
         }
         
         async function alternativeVerification() {
-            debugLog('Starting alternative verification...');
+            debugLog('Starting signature verification...');
             
             try {
                 const effectiveUserId = userId || userIdFromUrl || localStorage.getItem('userId');
@@ -531,17 +774,12 @@
                     }
                 }
                 
-                debugLog(`Alt verification with userId: ${effectiveUserId}, chatId: ${effectiveChatId}`);
+                debugLog(`Signature verification with userId: ${effectiveUserId}, chatId: ${effectiveChatId}`);
                 
                 if (!effectiveUserId) {
-                    debugLog('CRITICAL ERROR: Missing userId for alt verification!', 'error');
+                    debugLog('CRITICAL ERROR: Missing userId for signature verification!', 'error');
                     showStatus('Error: User ID tidak ditemukan.', 'error');
                     return;
-                }
-                
-                if (!effectiveChatId) {
-                    debugLog('WARNING: chatId not found, attempting to proceed with alt verification anyway', 'warning');
-                    showStatus('Peringatan: Chat ID tidak ditemukan. Mencoba melanjutkan verifikasi...', 'warning');
                 }
                 
                 const requestData = {
@@ -552,8 +790,11 @@
                 };
                 
                 const apiUrl = '/api/alt-verify';
-                debugLog(`Sending alt verification request to: ${apiUrl}`);
-                debugLog(`Request data keys: ${Object.keys(requestData).join(', ')}`);
+                debugLog(`Requesting signature challenge: ${apiUrl}`);
+                
+                // Show loading overlay while fetching
+                loadingOverlay.style.display = 'flex';
+                altVerifyBtn.disabled = true;
                 
                 const response = await fetch(apiUrl, {
                     method: 'POST',
@@ -564,68 +805,42 @@
                 });
                 
                 const result = await response.json();
-                debugLog(`Alt verification response: ${JSON.stringify(result)}`);
+                debugLog(`Signature challenge response: ${JSON.stringify(result)}`);
                 
                 if (result.success) {
-                    const captchaQuestion = result.captchaQuestion;
-                    debugLog(`Received captcha question: ${captchaQuestion}`);
+                    debugLog('Got signature challenge successfully', 'success');
                     
-                    const captchaPrompt = prompt(captchaQuestion);
+                    // Hide camera container and show signature container
+                    document.querySelector('.camera-container').style.display = 'none';
+                    signatureContainer.style.display = 'flex';
+                    verifyBtn.style.display = 'none';
+                    altVerifyBtn.style.display = 'none';
                     
-                    if (captchaPrompt) {
-                        debugLog(`User entered captcha answer: ${captchaPrompt}`);
-                        
-                        const captchaData = {
-                            userId: effectiveUserId,
-                            chatId: effectiveChatId,
-                            captchaAnswer: captchaPrompt,
-                            captchaToken: result.captchaToken,
-                            initData: initData,
-                            token: effectiveToken
-                        };
-                        
-                        debugLog('Verifying captcha answer...');
-                        
-                        const captchaUrl = '/api/verify-captcha';
-                        const verifyResponse = await fetch(captchaUrl, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify(captchaData)
-                        });
-                        
-                        const verifyResult = await verifyResponse.json();
-                        debugLog(`Captcha verification result: ${JSON.stringify(verifyResult)}`);
-                        
-                        if (verifyResult.success) {
-                            debugLog('Alternative verification successful!', 'success');
-                            showStatus('Verifikasi alternatif berhasil!', 'success');
-                            clearTimeout(verificationTimeout);
-                            
-                            setTimeout(() => {
-                                if (tg) {
-                                    tg.close();
-                                }
-                            }, 2000);
-                        } else {
-                            debugLog('Captcha verification failed', 'error');
-                            showStatus('Jawaban captcha salah. Silakan coba lagi.', 'error');
-                        }
-                    } else {
-                        debugLog('User cancelled captcha prompt', 'warning');
-                    }
+                    // Set challenge text
+                    signatureChallenge.innerText = `Silakan buat tanda tangan Anda untuk verifikasi:`;
+                    
+                    // Store signature token for submission
+                    signatureToken = result.signatureToken;
+                    challengeText = result.challenge;
+                    
+                    // Setup signature canvas
+                    setupSignatureCanvas();
+                    
+                    showStatus('Silakan buat tanda tangan Anda di area yang disediakan.', 'normal');
                 } else {
-                    debugLog(`Failed to get captcha: ${result.message}`, 'error');
-                    showStatus('Gagal mendapatkan captcha. Silakan coba lagi.', 'error');
+                    debugLog(`Failed to get signature challenge: ${result.message}`, 'error');
+                    showStatus(`Gagal memulai verifikasi tanda tangan: ${result.message}`, 'error');
                 }
             } catch (error) {
-                debugLog(`Error during alternative verification: ${error.message}`, 'error');
-                showStatus('Terjadi kesalahan saat verifikasi alternatif.', 'error');
+                debugLog(`Error during alt verification: ${error.message}`, 'error');
+                showStatus(`Terjadi kesalahan saat memulai verifikasi alternatif: ${error.message}`, 'error');
+            } finally {
+                loadingOverlay.style.display = 'none';
+                altVerifyBtn.disabled = false;
             }
         }
         
-        function showStatus(message, type) {
+        function showStatus(message, type = 'normal') {
             statusMessage.textContent = message;
             statusMessage.className = 'status-message';
             
@@ -634,54 +849,50 @@
             } else if (type === 'success') {
                 statusMessage.classList.add('success');
             }
-            
-            debugLog(`Status: ${type} - ${message}`);
         }
         
+        // Event listeners
         verifyBtn.addEventListener('click', verifyFace);
         altVerifyBtn.addEventListener('click', alternativeVerification);
         
-        // Handle visibility change to detect when the app goes to background
-        document.addEventListener('visibilitychange', async () => {
-            if (document.visibilityState === 'visible') {
-                // App comes back to foreground
-                debugLog('App came back to foreground, checking camera status');
-                
-                // Check if video is still active
-                if (stream && !stream.active) {
-                    debugLog('Camera stream inactive after visibility change, attempting restart', 'warning');
-                    await startCamera();
-                }
-            }
-        });
-        
-        // Handle device orientation change
-        window.addEventListener('orientationchange', async () => {
-            debugLog('Device orientation changed');
+        // Start camera when page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            debugLog('DOM content loaded');
             
-            // Small delay to allow orientation to complete
-            setTimeout(async () => {
-                // Check if video dimensions need to be updated
-                if (stream && stream.active) {
-                    debugLog('Adjusting video after orientation change');
-                    // Force a layout recalculation
-                    video.style.width = '99%';
-                    setTimeout(() => {
-                        video.style.width = '100%';
-                    }, 100);
-                }
-            }, 500);
+            // Initialize canvas for signature if window loaded
+            signatureCanvas.width = signatureCanvas.offsetWidth;
+            signatureCanvas.height = signatureCanvas.offsetHeight;
+            
+            // Start camera
+            startCamera();
         });
         
-        debugLog('DOM loaded, starting camera...');
-        startCamera();
-        
-        window.addEventListener('beforeunload', () => {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
+        // Handle window resize for signature canvas
+        window.addEventListener('resize', () => {
+            if (signatureContainer.style.display === 'flex') {
+                // Resize signature canvas
+                const oldData = signatureCtx.getImageData(0, 0, signatureCanvas.width, signatureCanvas.height);
+                
+                // Save current drawing
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = signatureCanvas.width;
+                tempCanvas.height = signatureCanvas.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.putImageData(oldData, 0, 0);
+                
+                // Resize canvas
+                signatureCanvas.width = signatureCanvas.offsetWidth;
+                signatureCanvas.height = signatureCanvas.offsetHeight;
+                
+                // Restore drawing
+                signatureCtx.drawImage(tempCanvas, 0, 0, signatureCanvas.width, signatureCanvas.height);
+                
+                // Reset stroke style
+                signatureCtx.lineWidth = 3;
+                signatureCtx.lineJoin = 'round';
+                signatureCtx.lineCap = 'round';
+                signatureCtx.strokeStyle = '#000';
             }
-            clearTimeout(verificationTimeout);
-            clearTimeout(cameraStartTimeout);
         });
     </script>
 </body>
