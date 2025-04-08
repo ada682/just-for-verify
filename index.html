@@ -183,9 +183,28 @@
         const urlParams = new URLSearchParams(window.location.search);
         const token = urlParams.get('token');
         const chatId = urlParams.get('chatId');
+        const userIdFromUrl = urlParams.get('userId');
         
-        debugLog(`Chat ID from URL: ${chatId}`);
-        debugLog(`Token from URL: ${token}`);
+        // Store parameters in localStorage as backup
+        if (userIdFromUrl) {
+            localStorage.setItem('userId', userIdFromUrl);
+            debugLog(`Stored userId in localStorage: ${userIdFromUrl}`, 'success');
+        }
+        
+        if (chatId) {
+            localStorage.setItem('chatId', chatId);
+            debugLog(`Stored chatId in localStorage: ${chatId}`, 'success');
+        }
+        
+        if (token) {
+            localStorage.setItem('token', token);
+            debugLog(`Stored token in localStorage: ${token}`, 'success');
+        }
+        
+        debugLog(`Chat ID from URL: ${chatId || 'Not found'}`);
+        debugLog(`Token from URL: ${token || 'Not found'}`);
+        debugLog(`User ID from URL: ${userIdFromUrl || 'Not found'}`);
+        debugLog(`Full URL: ${window.location.href}`);
         
         // Check if Telegram WebApp is available
         let tg = null;
@@ -201,17 +220,32 @@
                 
                 // Try to get initData
                 initData = tg.initData || '';
+                debugLog(`Init data length: ${initData.length} characters`);
                 
                 // Get user info if available
                 if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
                     userId = tg.initDataUnsafe.user.id;
-                    debugLog(`User ID from Telegram: ${userId}`);
+                    debugLog(`User ID from Telegram: ${userId}`, 'success');
                     debugLog(`User Info: ${JSON.stringify({
                         first_name: tg.initDataUnsafe.user.first_name,
                         username: tg.initDataUnsafe.user.username || 'None'
                     })}`);
+                    
+                    // Store in localStorage
+                    localStorage.setItem('userId', userId);
                 } else {
                     debugLog(`No user data in initDataUnsafe`, 'warning');
+                }
+                
+                if (tg.initDataUnsafe) {
+                    debugLog(`Start param: ${tg.initDataUnsafe.start_param || 'none'}`);
+                    debugLog(`Chat instance: ${tg.initDataUnsafe.chat_instance || 'none'}`);
+                    debugLog(`Chat type: ${tg.initDataUnsafe.chat_type || 'none'}`);
+                    
+                    if (tg.initDataUnsafe.chat && tg.initDataUnsafe.chat.id) {
+                        debugLog(`Chat ID from initDataUnsafe: ${tg.initDataUnsafe.chat.id}`, 'success');
+                        localStorage.setItem('chatId', tg.initDataUnsafe.chat.id);
+                    }
                 }
                 
                 // Expand the WebApp
@@ -222,11 +256,11 @@
         } else {
             debugLog(`Telegram WebApp available: false`, 'warning');
             debugLog(`WARNING: Telegram WebApp is not available!`, 'warning');
-            
-            // Fallback - get userId from URL if not available from Telegram
-            userId = urlParams.get('userId') || '';
-            debugLog(`Fallback: Using userId from URL: ${userId || 'Not provided'}`, 'warning');
         }
+        
+        // Fallback - get userId from URL if not available from Telegram
+        userId = userId || userIdFromUrl || localStorage.getItem('userId') || '';
+        debugLog(`Final userId being used: ${userId || 'Not available'}`, userId ? 'success' : 'warning');
         
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
@@ -243,6 +277,22 @@
         // Function to start camera
         async function startCamera() {
             try {
+                // Enhanced URL parameter logging
+                debugLog('🔍 URL Parameters Check:');
+                debugLog(`userId from URL: ${userIdFromUrl || 'Not found'}`);
+                debugLog(`chatId from URL: ${chatId || 'Not found'}`);
+                debugLog(`token from URL: ${token || 'Not found'}`);
+                debugLog(`localStorage userId: ${localStorage.getItem('userId') || 'Not found'}`);
+                debugLog(`localStorage chatId: ${localStorage.getItem('chatId') || 'Not found'}`);
+                
+                // Check Telegram WebApp data again
+                if (tg && tg.initDataUnsafe) {
+                    debugLog('Telegram WebApp Data:', 'info');
+                    debugLog(`startParam: ${tg.initDataUnsafe.start_param || 'none'}`);
+                    debugLog(`chatInstance: ${tg.initDataUnsafe.chat_instance || 'none'}`);
+                    debugLog(`chatType: ${tg.initDataUnsafe.chat_type || 'none'}`);
+                }
+                
                 debugLog('Requesting camera access...');
                 
                 stream = await navigator.mediaDevices.getUserMedia({
@@ -314,19 +364,38 @@
                 const imageData = canvas.toDataURL('image/jpeg', 0.8);
                 debugLog(`Image captured successfully (${Math.round(imageData.length / 1024)}KB)`);
                 
+                // Get parameters with fallbacks
+                const effectiveUserId = userId || userIdFromUrl || localStorage.getItem('userId');
+                const effectiveChatId = chatId || localStorage.getItem('chatId');
+                const effectiveToken = token || localStorage.getItem('token');
+                
+                // Log what we're actually sending
+                debugLog(`Sending verification with userId: ${effectiveUserId}, chatId: ${effectiveChatId}`);
+                
+                if (!effectiveUserId || !effectiveChatId) {
+                    debugLog('CRITICAL ERROR: Missing userId or chatId for verification!', 'error');
+                    debugLog(`userId value: ${effectiveUserId}`, 'error');
+                    debugLog(`chatId value: ${effectiveChatId}`, 'error');
+                    showStatus('Error: User ID atau Chat ID tidak ditemukan. Coba gunakan verifikasi alternatif.', 'error');
+                    loadingOverlay.style.display = 'none';
+                    verifyBtn.disabled = false;
+                    return;
+                }
+                
                 // Create request data
                 const requestData = {
                     image: imageData,
-                    userId: userId || urlParams.get('userId') || 'unknown',
-                    chatId: chatId,
+                    userId: effectiveUserId,
+                    chatId: effectiveChatId,
                     initData: initData,
-                    token: token
+                    token: effectiveToken
                 };
                 
                 // Try HTTP instead of HTTPS if we're on Vercel (which is already HTTPS)
                 // This helps avoid mixed content issues
                 const apiUrl = '/api/verify';
                 debugLog(`Sending verification to: ${apiUrl}`);
+                debugLog(`Request data keys: ${Object.keys(requestData).join(', ')}`);
 
                 // Send data to backend for verification
                 const response = await fetch(apiUrl, {
@@ -369,17 +438,31 @@
             debugLog('Starting alternative verification...');
             
             try {
+                // Get parameters with fallbacks
+                const effectiveUserId = userId || userIdFromUrl || localStorage.getItem('userId');
+                const effectiveChatId = chatId || localStorage.getItem('chatId');
+                const effectiveToken = token || localStorage.getItem('token');
+                
+                debugLog(`Alt verification with userId: ${effectiveUserId}, chatId: ${effectiveChatId}`);
+                
+                if (!effectiveUserId || !effectiveChatId) {
+                    debugLog('CRITICAL ERROR: Missing userId or chatId for alt verification!', 'error');
+                    showStatus('Error: User ID atau Chat ID tidak ditemukan.', 'error');
+                    return;
+                }
+                
                 // Create request data
                 const requestData = {
-                    userId: userId || urlParams.get('userId') || 'unknown',
-                    chatId: chatId,
+                    userId: effectiveUserId,
+                    chatId: effectiveChatId,
                     initData: initData,
-                    token: token
+                    token: effectiveToken
                 };
                 
                 // Use HTTP API URL
                 const apiUrl = '/api/alt-verify';
                 debugLog(`Sending alt verification request to: ${apiUrl}`);
+                debugLog(`Request data keys: ${Object.keys(requestData).join(', ')}`);
                 
                 const response = await fetch(apiUrl, {
                     method: 'POST',
@@ -402,12 +485,12 @@
                         debugLog(`User entered captcha answer: ${captchaPrompt}`);
                         
                         const captchaData = {
-                            userId: userId || urlParams.get('userId') || 'unknown',
-                            chatId: chatId,
+                            userId: effectiveUserId,
+                            chatId: effectiveChatId,
                             captchaAnswer: captchaPrompt,
                             captchaToken: result.captchaToken,
                             initData: initData,
-                            token: token
+                            token: effectiveToken
                         };
                         
                         debugLog('Verifying captcha answer...');
