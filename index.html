@@ -112,49 +112,6 @@
             font-size: 12px;
             text-align: left;
         }
-        
-        /* New styles for improved UI */
-        .warning-box {
-            background-color: #fff3cd;
-            border-left: 4px solid #ffc107;
-            padding: 10px;
-            margin: 15px 0;
-            border-radius: 4px;
-            font-size: 14px;
-            text-align: left;
-        }
-        
-        .help-text {
-            font-size: 13px;
-            color: #666;
-            margin: 5px 0 15px;
-        }
-        
-        .button-container {
-            display: flex;
-            flex-direction: column;
-            width: 100%;
-            gap: 10px;
-        }
-        
-        #retryBtn {
-            background-color: #ff9800;
-        }
-        
-        #altVerifyBtn {
-            background-color: #673ab7;
-        }
-        
-        .camera-permissions-guide {
-            background-color: #e3f2fd;
-            border-left: 4px solid #2196f3;
-            padding: 10px;
-            margin: 15px 0;
-            border-radius: 4px;
-            font-size: 14px;
-            text-align: left;
-            display: none;
-        }
     </style>
 </head>
 <body>
@@ -166,17 +123,8 @@
            <p style="margin: 0; font-size: 14px;"><strong>Privasi Anda Penting:</strong> Gambar wajah Anda hanya digunakan untuk verifikasi saat ini dan <span style="text-decoration: underline;">tidak akan disimpan</span> setelah proses selesai.</p>
         </div>
         
-        <div class="camera-permissions-guide" id="cameraPermissionsGuide">
-            <p style="margin: 0; font-weight: bold;">🔒 Panduan Izin Kamera:</p>
-            <ul style="margin: 5px 0 0 20px; padding: 0;">
-                <li style="margin-bottom: 5px;">Pastikan Anda telah memberikan izin kamera ke Telegram</li>
-                <li style="margin-bottom: 5px;">Jika kamera tidak muncul, coba <b>Tutup dan Buka Kembali</b> mini app ini</li>
-                <li>Jika masih bermasalah, gunakan tombol <b>Verifikasi Alternatif</b></li>
-            </ul>
-        </div>
-        
         <div class="camera-container">
-            <video id="video" playsinline autoplay muted style="width: 100%; background-color: #000; border-radius: 12px;"></video>
+            <video id="video" playsinline autoplay></video>
             <canvas id="canvas"></canvas>
             <div class="loading-overlay">
                 <div class="spinner"></div>
@@ -184,21 +132,9 @@
             </div>
         </div>
         
-        <div class="warning-box" id="cameraWarning" style="display: none;">
-            <p style="margin: 0;"><strong>⚠️ Masalah Kamera Terdeteksi</strong></p>
-            <p style="margin: 5px 0 0;">Jika kamera tidak muncul atau tampak hitam, coba:</p>
-            <ol style="margin: 5px 0 0 20px; padding: 0;">
-                <li>Klik tombol "Coba Ulang Kamera"</li>
-                <li>Pastikan izin kamera sudah diberikan</li>
-                <li>Jika masih bermasalah, gunakan "Verifikasi Alternatif"</li>
-            </ol>
-        </div>
-        
-        <div class="button-container">
-            <button id="verifyBtn" class="button" disabled>Verifikasi Wajah</button>
-            <button id="retryBtn" class="button">Coba Ulang Kamera</button>
-            <button id="altVerifyBtn" class="button">Verifikasi Alternatif</button>
-        </div>
+        <button id="verifyBtn" class="button" disabled>Verifikasi Wajah</button>
+        <button id="retryBtn" class="button">Coba Ulang Kamera</button>
+        <button id="altVerifyBtn" class="button">Verifikasi Alternatif</button>
         
         <div id="statusMessage" class="status-message"></div>
         
@@ -244,14 +180,22 @@
             console.log(`[${timestamp}] ${message}`);
         }
 
-        // Platform detection functions
-        function isIOS() {
-            return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        }
-
-        function isMobile() {
-            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        // Log device and browser information
+        function logDeviceInfo() {
+            debugLog(`Browser: ${navigator.userAgent}`);
+            debugLog(`Screen: ${window.screen.width}x${window.screen.height}`);
+            debugLog(`Window: ${window.innerWidth}x${window.innerHeight}`);
+            
+            // Check if it's a mobile device
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            debugLog(`Mobile device: ${isMobile ? 'Yes' : 'No'}`);
+            
+            // Check for camera support
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                debugLog('getUserMedia is supported');
+            } else {
+                debugLog('getUserMedia is NOT supported', 'error');
+            }
         }
 
         // Get URL parameters
@@ -280,9 +224,6 @@
         debugLog(`Token from URL: ${token || 'Not found'}`);
         debugLog(`User ID from URL: ${userIdFromUrl || 'Not found'}`);
         debugLog(`Full URL: ${window.location.href}`);
-        debugLog(`Browser: ${navigator.userAgent}`);
-        debugLog(`Is iOS: ${isIOS()}`);
-        debugLog(`Is Mobile: ${isMobile()}`);
         
         // Check if Telegram WebApp is available
         let tg = null;
@@ -347,177 +288,166 @@
         const altVerifyBtn = document.getElementById('altVerifyBtn');
         const statusMessage = document.getElementById('statusMessage');
         const loadingOverlay = document.querySelector('.loading-overlay');
-        const cameraWarning = document.getElementById('cameraWarning');
-        const cameraPermissionsGuide = document.getElementById('cameraPermissionsGuide');
         const ctx = canvas.getContext('2d');
         
         let stream = null;
         let verificationTimeout = null;
+        const TIMEOUT_DURATION = 120000; // 2 minutes
         let cameraRetryCount = 0;
         const MAX_CAMERA_RETRIES = 3;
-        const TIMEOUT_DURATION = 120000; // 2 minutes
-        const CAMERA_CHECK_INTERVAL = 1000; // 1 second
-        let cameraCheckTimer = null;
         
-        // Function to check if camera is actually working
-        function checkCameraStream() {
-            if (!stream) return;
-            
-            const tracks = stream.getVideoTracks();
-            if (tracks.length === 0) {
-                debugLog('No video tracks found in stream', 'error');
-                handleCameraFailure('Tidak ada aliran video');
-                return;
-            }
-            
-            const videoTrack = tracks[0];
-            if (!videoTrack.enabled || videoTrack.muted || !videoTrack.readyState === 'live') {
-                debugLog(`Video track status: enabled=${videoTrack.enabled}, muted=${videoTrack.muted}, readyState=${videoTrack.readyState}`, 'warning');
-            }
-            
-            // Check if video has dimensions
-            if (video.videoWidth === 0 || video.videoHeight === 0) {
-                debugLog('Video dimensions are zero', 'warning');
-                cameraWarning.style.display = 'block';
-                
-                // If we've tried enough times, show the permissions guide
-                if (++cameraRetryCount >= 2) {
-                    cameraPermissionsGuide.style.display = 'block';
-                }
-                
-                if (cameraRetryCount >= MAX_CAMERA_RETRIES) {
-                    debugLog('Maximum camera retry count reached', 'error');
-                    handleCameraFailure('Kamera tidak berfungsi setelah beberapa percobaan');
-                    clearInterval(cameraCheckTimer);
-                }
-            } else {
-                debugLog(`Camera active with dimensions: ${video.videoWidth}x${video.videoHeight}`, 'success');
-                cameraWarning.style.display = 'none';
-                clearInterval(cameraCheckTimer);
-            }
-        }
-        
-        // Function to handle camera failures
-        function handleCameraFailure(errorMessage) {
-            debugLog(`Camera failure: ${errorMessage}`, 'error');
-            showStatus(`Kamera tidak berfungsi: ${errorMessage}. Silakan gunakan verifikasi alternatif.`, 'error');
-            
-            // Make alternative verification more prominent
-            altVerifyBtn.style.backgroundColor = '#4caf50';
-            altVerifyBtn.style.fontWeight = 'bold';
-            
-            // Show camera permissions guide
-            cameraPermissionsGuide.style.display = 'block';
-            
-            // Show camera warning
-            cameraWarning.style.display = 'block';
-        }
-        
-        // Improved function to start camera
+        // Function to start camera
         async function startCamera() {
-            debugLog('Requesting camera access...');
-            cameraWarning.style.display = 'none';
-            showStatus('Meminta akses kamera...', 'normal');
-            cameraRetryCount = 0;
-            
             try {
-                // First try to check if permission is already granted
-                try {
-                    const permissionStatus = await navigator.permissions.query({ name: 'camera' });
-                    debugLog(`Camera permission status: ${permissionStatus.state}`);
-                    
-                    if (permissionStatus.state === 'denied') {
-                        debugLog('Camera permission is denied', 'error');
-                        handleCameraFailure('Izin kamera ditolak. Silakan aktifkan kamera di pengaturan browser Anda.');
-                        return;
-                    }
-                } catch (permErr) {
-                    debugLog(`Error checking camera permissions: ${permErr.message}`, 'warning');
-                    // Continue anyway as some browsers don't support permissions API
+                // Log device info before starting camera
+                if (cameraRetryCount === 0) {
+                    logDeviceInfo();
                 }
                 
-                // Stop any existing stream
+                // Enhanced URL parameter logging
+                debugLog('🔍 URL Parameters Check:');
+                debugLog(`userId from URL: ${userIdFromUrl || 'Not found'}`);
+                debugLog(`chatId from URL: ${chatId || 'Not found'}`);
+                debugLog(`token from URL: ${token || 'Not found'}`);
+                debugLog(`localStorage userId: ${localStorage.getItem('userId') || 'Not found'}`);
+                debugLog(`localStorage chatId: ${localStorage.getItem('chatId') || 'Not found'}`);
+                
+                // Check Telegram WebApp data again
+                if (tg && tg.initDataUnsafe) {
+                    debugLog('Telegram WebApp Data:', 'info');
+                    debugLog(`startParam: ${tg.initDataUnsafe.start_param || 'none'}`);
+                    debugLog(`chatInstance: ${tg.initDataUnsafe.chat_instance || 'none'}`);
+                    debugLog(`chatType: ${tg.initDataUnsafe.chat_type || 'none'}`);
+                }
+                
+                debugLog('Requesting camera access...');
+                
+                // Stop any existing streams
                 if (stream) {
                     stream.getTracks().forEach(track => track.stop());
                     stream = null;
                 }
                 
-                // Create constraints with fallback options
-                const constraints = {
+                // Use more explicit constraints for better mobile compatibility
+                stream = await navigator.mediaDevices.getUserMedia({
                     video: { 
                         facingMode: 'user',
-                        width: { ideal: 640 },
-                        height: { ideal: 480 }
+                        width: { ideal: 640, min: 320 },
+                        height: { ideal: 480, min: 240 },
+                        aspectRatio: { ideal: 1.33333 }
                     },
-                    audio: false
-                };
+                    audio: false  // Explicitly disable audio
+                });
                 
-                // Try to get the stream
-                stream = await navigator.mediaDevices.getUserMedia(constraints);
                 debugLog('Camera access granted!', 'success');
-                
-                // Explicitly set video attributes
                 video.srcObject = stream;
-                video.setAttribute('playsinline', true); // Important for iOS
-                video.setAttribute('autoplay', true);
-                video.muted = true;
+                cameraRetryCount = 0; // Reset retry count on success
                 
-                // Force play attempt
-                try {
-                    await video.play();
-                    debugLog('Video playback started');
-                } catch (playErr) {
-                    debugLog(`Error playing video: ${playErr.message}`, 'error');
-                    
-                    // Special handling for iOS
-                    if (isIOS()) {
-                        debugLog('iOS detected, attempting special play handling');
-                        video.setAttribute('controls', true);
-                        setTimeout(() => {
-                            video.removeAttribute('controls');
-                        }, 1000);
-                    }
-                }
-                
-                // Add more detailed event handlers
+                // Check if video has loaded metadata and dimensions
                 video.onloadedmetadata = () => {
-                    debugLog(`Video metadata loaded: ${video.videoWidth}x${video.videoHeight}`);
+                    debugLog(`Video metadata loaded`);
+                    if (video.videoWidth && video.videoHeight) {
+                        debugLog(`Initial video dimensions: ${video.videoWidth} x ${video.videoHeight}`);
+                        verifyBtn.disabled = false;
+                    } else {
+                        debugLog(`Warning: Video dimensions not available yet`, 'warning');
+                    }
                 };
                 
+                // Check when video actually starts playing
                 video.onplaying = () => {
-                    debugLog(`Video is playing: ${video.videoWidth}x${video.videoHeight}`);
+                    debugLog(`Video is playing, dimensions: ${video.videoWidth} x ${video.videoHeight}`);
                     if (video.videoWidth && video.videoHeight) {
                         verifyBtn.disabled = false;
                         showStatus('Kamera siap. Silakan klik tombol Verifikasi Wajah.', 'normal');
+                    } else {
+                        debugLog(`Warning: Video is playing but dimensions are zero`, 'warning');
                     }
+                };
+                
+                // Additional check to detect black screen issues
+                video.onloadeddata = () => {
+                    // Wait a bit to ensure video has had time to get actual frames
+                    setTimeout(() => {
+                        if (video.videoWidth === 0 || video.videoHeight === 0) {
+                            debugLog('Video dimensions are zero, camera might not be working properly', 'warning');
+                            showStatus('Kamera tidak merender gambar dengan benar. Coba "Coba Ulang Kamera"', 'error');
+                        } else {
+                            debugLog(`Video dimensions confirmed: ${video.videoWidth}x${video.videoHeight}`, 'success');
+                            
+                            // Try to draw a frame to canvas to check if video is actually producing content
+                            try {
+                                ctx.drawImage(video, 0, 0, 1, 1);
+                                debugLog('Successfully captured test frame from video', 'success');
+                            } catch (e) {
+                                debugLog(`Failed to capture test frame: ${e.message}`, 'error');
+                                showStatus('Masalah dengan kamera terdeteksi. Coba "Coba Ulang Kamera"', 'error');
+                            }
+                        }
+                    }, 2000);
                 };
                 
                 // Add error handler for video element
                 video.onerror = (e) => {
-                    debugLog(`Video element error: ${e.target.error}`, 'error');
-                    handleCameraFailure('Error pada elemen video');
+                    debugLog(`Video element error: ${e.target.error ? e.target.error.message : 'Unknown error'}`, 'error');
+                    showStatus('Error pada elemen video. Coba "Coba Ulang Kamera"', 'error');
                 };
-                
-                // Set up camera check timer
-                clearInterval(cameraCheckTimer);
-                cameraCheckTimer = setInterval(checkCameraStream, CAMERA_CHECK_INTERVAL);
                 
                 // Start verification timeout
                 startVerificationTimeout();
             } catch (err) {
                 debugLog(`Error accessing camera: ${err.name} - ${err.message}`, 'error');
-                showStatus(`Tidak dapat mengakses kamera: ${err.message}. Silakan gunakan verifikasi alternatif.`, 'error');
                 
-                // Make alternative verification more visible when camera fails
-                altVerifyBtn.style.backgroundColor = '#4caf50';
-                cameraWarning.style.display = 'block';
-                cameraPermissionsGuide.style.display = 'block';
+                // Show specific error messages based on the error type
+                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    showStatus('Akses kamera ditolak. Silakan izinkan kamera di pengaturan browser Anda dan coba lagi.', 'error');
+                } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                    showStatus('Kamera tidak ditemukan pada perangkat Anda.', 'error');
+                } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+                    showStatus('Kamera sudah digunakan oleh aplikasi lain. Tutup aplikasi tersebut dan coba lagi.', 'error');
+                } else if (err.name === 'OverconstrainedError') {
+                    showStatus('Kamera tidak dapat memenuhi persyaratan yang diminta. Coba gunakan verifikasi alternatif.', 'error');
+                } else {
+                    showStatus(`Tidak dapat mengakses kamera: ${err.message}. Silakan gunakan verifikasi alternatif.`, 'error');
+                }
+                
+                cameraRetryCount++;
+                if (cameraRetryCount < MAX_CAMERA_RETRIES) {
+                    debugLog(`Automatic retry attempt ${cameraRetryCount} of ${MAX_CAMERA_RETRIES}...`);
+                    setTimeout(startCamera, 1500);
+                } else {
+                    debugLog(`Max retry attempts (${MAX_CAMERA_RETRIES}) reached. Please use manual retry button.`, 'error');
+                }
             }
+        }
+        
+        // Function to retry camera access
+        function retryCamera() {
+            debugLog('Manual camera retry requested', 'warning');
+            cameraRetryCount = 0; // Reset retry count for manual attempts
+            
+            // Reset UI
+            verifyBtn.disabled = true;
+            showStatus('Mencoba ulang akses kamera...', 'normal');
+            
+            // Stop existing stream if any
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+                video.srcObject = null;
+            }
+            
+            // Wait a moment before retrying
+            setTimeout(startCamera, 1000);
         }
         
         // Function for verification timeout
         function startVerificationTimeout() {
-            clearTimeout(verificationTimeout);
+            // Clear any existing timeout
+            if (verificationTimeout) {
+                clearTimeout(verificationTimeout);
+            }
+            
             verificationTimeout = setTimeout(() => {
                 debugLog('Verification timeout reached', 'warning');
                 showStatus('Waktu verifikasi habis. Silakan coba lagi.', 'error');
@@ -535,33 +465,47 @@
                 return;
             }
             
-            // Check if video has dimensions
-            if (video.videoWidth === 0 || video.videoHeight === 0) {
-                debugLog('Cannot capture image: Video dimensions are zero', 'error');
-                showStatus('Tidak dapat mengambil gambar: Kamera tidak aktif', 'error');
-                cameraWarning.style.display = 'block';
-                return;
-            }
-            
             debugLog('Taking photo and sending verification request...');
             loadingOverlay.style.display = 'flex';
             verifyBtn.disabled = true;
             
             try {
+                // Capture image from video
                 const videoWidth = video.videoWidth || 640;
                 const videoHeight = video.videoHeight || 480;
                 
                 canvas.width = videoWidth;
                 canvas.height = videoHeight;
-                ctx.drawImage(video, 0, 0, videoWidth, videoHeight);
                 
-                const imageData = canvas.toDataURL('image/jpeg', 0.8);
-                debugLog(`Image captured successfully (${Math.round(imageData.length / 1024)}KB)`);
+                // Check if video has valid data before drawing
+                if (videoWidth === 0 || videoHeight === 0) {
+                    throw new Error('Video dimensions are invalid. Camera may not be working properly.');
+                }
                 
+                try {
+                    ctx.drawImage(video, 0, 0, videoWidth, videoHeight);
+                    debugLog('Image captured to canvas successfully');
+                } catch (drawErr) {
+                    debugLog(`Error capturing image: ${drawErr.message}`, 'error');
+                    throw new Error('Failed to capture image from camera. Try retrying camera.');
+                }
+                
+                // Convert to base64
+                let imageData;
+                try {
+                    imageData = canvas.toDataURL('image/jpeg', 0.8);
+                    debugLog(`Image converted to base64 successfully (${Math.round(imageData.length / 1024)}KB)`);
+                } catch (dataUrlErr) {
+                    debugLog(`Error converting to base64: ${dataUrlErr.message}`, 'error');
+                    throw new Error('Failed to process captured image. Try retrying camera.');
+                }
+                
+                // Get parameters with fallbacks
                 const effectiveUserId = userId || userIdFromUrl || localStorage.getItem('userId');
                 const effectiveChatId = chatId || localStorage.getItem('chatId');
                 const effectiveToken = token || localStorage.getItem('token');
                 
+                // Log what we're actually sending
                 debugLog(`Sending verification with userId: ${effectiveUserId}, chatId: ${effectiveChatId}`);
                 
                 if (!effectiveUserId || !effectiveChatId) {
@@ -574,6 +518,7 @@
                     return;
                 }
                 
+                // Create request data
                 const requestData = {
                     image: imageData,
                     userId: effectiveUserId,
@@ -582,10 +527,13 @@
                     token: effectiveToken
                 };
                 
+                // Try HTTP instead of HTTPS if we're on Vercel (which is already HTTPS)
+                // This helps avoid mixed content issues
                 const apiUrl = '/api/verify';
                 debugLog(`Sending verification to: ${apiUrl}`);
                 debugLog(`Request data keys: ${Object.keys(requestData).join(', ')}`);
 
+                // Send data to backend for verification
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: {
@@ -621,10 +569,12 @@
             }
         }
         
+        // Function for alternative verification
         async function alternativeVerification() {
             debugLog('Starting alternative verification...');
             
             try {
+                // Get parameters with fallbacks
                 const effectiveUserId = userId || userIdFromUrl || localStorage.getItem('userId');
                 const effectiveChatId = chatId || localStorage.getItem('chatId');
                 const effectiveToken = token || localStorage.getItem('token');
@@ -637,6 +587,7 @@
                     return;
                 }
                 
+                // Create request data
                 const requestData = {
                     userId: effectiveUserId,
                     chatId: effectiveChatId,
@@ -732,25 +683,30 @@
             debugLog(`Status: ${type} - ${message}`);
         }
         
-        function initializeCamera() {
-            debugLog(`Initializing camera for ${isIOS() ? 'iOS' : isMobile() ? 'mobile' : 'desktop'}`);
-            
-            if (isIOS()) {
-                debugLog('iOS device detected, using special handling');
-                
-                const match = navigator.userAgent.match(/OS (\d+)_(\d+)_?(\d+)?/);
-                if (match) {
-                    const version = [
-                        parseInt(match[1], 10),
-                        parseInt(match[2], 10),
-                        parseInt(match[3] || 0, 10)
-                    ];
-                    debugLog(`iOS version: ${version.join('.')}`);
-                    
-                    if (version[0] >= 15) {
-                        debugLog('iOS 15+ detected, showing permission guide');
-                        cameraPermissionsGuide.style.display = 'block';
-                    }
+        window.addEventListener('orientationchange', () => {
+            debugLog('Orientation changed, adjusting camera...');
+            setTimeout(() => {
+                if (stream && video.videoWidth > 0) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    debugLog(`Adjusted to new dimensions: ${video.videoWidth}x${video.videoHeight}`);
                 }
-                
-                showStatus('Coba
+            }, 500);
+        });
+        
+        verifyBtn.addEventListener('click', verifyFace);
+        retryBtn.addEventListener('click', retryCamera);
+        altVerifyBtn.addEventListener('click', alternativeVerification);
+        
+        debugLog('DOM loaded, starting camera...');
+        startCamera();
+        
+        window.addEventListener('beforeunload', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            clearTimeout(verificationTimeout);
+        });
+    </script>
+</body>
+</html>
