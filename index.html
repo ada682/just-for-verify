@@ -320,7 +320,7 @@
                 
                 // Try HTTP instead of HTTPS if we're on Vercel (which is already HTTPS)
                 // This helps avoid mixed content issues
-                const apiUrl = 'http://188.166.232.216:3000/api/verify';
+                const apiUrl = '/api/verify';
                 debugLog(`Sending verification to: ${apiUrl}`);
 
                 // Send data to backend for verification
@@ -373,7 +373,7 @@
                 };
                 
                 // Use HTTP API URL
-                const apiUrl = 'http://188.166.232.216:3000/api/alt-verify';
+                const apiUrl = '/api/alt-verify';
                 debugLog(`Sending alt verification request to: ${apiUrl}`);
                 
                 const response = await fetch(apiUrl, {
@@ -407,7 +407,7 @@
                         
                         debugLog('Verifying captcha answer...');
                         
-                        const captchaUrl = 'http://188.166.232.216:3000/api/verify-captcha';
+                        const captchaUrl = '/api/verify-captcha';
                         const verifyResponse = await fetch(captchaUrl, {
                             method: 'POST',
                             headers: {
