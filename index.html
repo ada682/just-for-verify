@@ -399,7 +399,6 @@
             background-color: rgba(0, 0, 0, 0.4);
         }
         
-        /* Animations */
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
@@ -418,7 +417,6 @@
             animation: slideUp 0.5s ease forwards;
         }
         
-        /* Media Queries */
         @media (max-width: 480px) {
             .app-container {
                 padding: 16px 12px;
@@ -486,7 +484,6 @@
             <div id="statusMessage" class="status-message" style="display: none;"></div>
         </div>
         
-        <!-- Signature Verification Container -->
         <div class="card signature-container" id="signatureContainer">
             <div class="signature-challenge" id="signatureChallenge">
                 Silakan buat tanda tangan Anda:
@@ -518,7 +515,6 @@
     </div>
 
     <script>
-        // Debug Console Functions
         function debugLog(message, type = 'info') {
             const debugConsole = document.getElementById('debug-console');
             const timestamp = new Date().toLocaleTimeString();
@@ -551,7 +547,6 @@
             console.log(`[${timestamp}] ${message}`);
         }
 
-        // URL Parameters and Storage
         const urlParams = new URLSearchParams(window.location.search);
         const token = urlParams.get('token');
         const chatId = urlParams.get('chatId');
@@ -575,7 +570,6 @@
             debugLog(`Stored token in localStorage: ${token}`, 'success');
         }
         
-        // Telegram WebApp initialization
         let tg = null;
         let userId = null;
         let initData = '';
@@ -630,7 +624,6 @@
         userId = userId || userIdFromUrl || localStorage.getItem('userId') || '';
         debugLog(`Final userId being used: ${userId || 'Not available'}`, userId ? 'success' : 'warning');
         
-        // DOM Elements
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const verifyBtn = document.getElementById('verifyBtn');
@@ -640,7 +633,6 @@
         const cameraSwitch = document.getElementById('cameraSwitch');
         const ctx = canvas.getContext('2d');
         
-        // Signature elements
         const signatureContainer = document.getElementById('signatureContainer');
         const signatureCanvas = document.getElementById('signatureCanvas');
         const signatureChallenge = document.getElementById('signatureChallenge');
@@ -657,10 +649,9 @@
         let challengeText = null;
         let facingMode = 'user'; // default front camera
         
-        const TIMEOUT_DURATION = 120000; // 2 minutes
-        const CAMERA_START_TIMEOUT = 15000; // 15 seconds
+        const TIMEOUT_DURATION = 120000; 
+        const CAMERA_START_TIMEOUT = 15000; 
         
-        // Helper Functions
         function showLoading(message = 'Memverifikasi...') {
             document.getElementById('loadingText').textContent = message;
             loadingOverlay.classList.add('show');
@@ -692,19 +683,15 @@
             statusMessage.style.display = 'flex';
         }
         
-        // Setup signature canvas
         function setupSignatureCanvas() {
-            // Set canvas size
             signatureCanvas.width = signatureCanvas.offsetWidth;
             signatureCanvas.height = signatureCanvas.offsetHeight;
             
-            // Initialize signature canvas
             signatureCtx.lineWidth = 3;
             signatureCtx.lineJoin = 'round';
             signatureCtx.lineCap = 'round';
             signatureCtx.strokeStyle = '#000';
             
-            // Mouse events
             signatureCanvas.addEventListener('mousedown', startDrawing);
             signatureCanvas.addEventListener('mousemove', draw);
             signatureCanvas.addEventListener('mouseup', stopDrawing);
@@ -779,14 +766,13 @@
         function isCanvasEmpty() {
             const pixelData = signatureCtx.getImageData(0, 0, signatureCanvas.width, signatureCanvas.height).data;
             
-            // Check if all pixel data is empty (transparent)
             for (let i = 0; i < pixelData.length; i += 4) {
                 if (pixelData[i + 3] !== 0) {
-                    return false; // Found a non-transparent pixel
+                    return false; 
                 }
             }
             
-            return true; // All pixels are transparent
+            return true; 
         }
         
         function startVerificationTimeout() {
@@ -799,7 +785,6 @@
             }, TIMEOUT_DURATION);
         }
         
-        // Camera Functions
         async function startCamera() {
             try {
                 debugLog('🔍 URL Parameters Check:');
@@ -816,22 +801,18 @@
                     audio: false
                 };
                 
-                // If there's an existing stream, stop it
                 if (stream) {
                     stream.getTracks().forEach(track => track.stop());
                 }
                 
-                // Try to get any video first
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
                 debugLog('Camera access granted!', 'success');
                 video.srcObject = stream;
                 
-                // Set a timeout for camera initialization
                 cameraStartTimeout = setTimeout(() => {
                     if (!video.videoWidth || !video.videoHeight) {
                         debugLog('Camera stream not showing, attempting to recover...', 'warning');
                         
-                        // Try with more specific constraints
                         restartCameraWithSpecificConstraints();
                     }
                 }, CAMERA_START_TIMEOUT);
@@ -854,7 +835,6 @@
                 debugLog(`Error accessing camera: ${err.name} - ${err.message}`, 'error');
                 showStatus(`Tidak dapat mengakses kamera: ${err.message}. Silakan gunakan verifikasi tanda tangan.`, 'error');
                 
-                // If permission denied or device not found, offer alternative verification
                 if (err.name === 'NotAllowedError' || err.name === 'NotFoundError') {
                     verifyBtn.disabled = true;
                 }
@@ -866,12 +846,10 @@
             debugLog(`Switching camera to: ${facingMode}`);
             
             try {
-                // Stop current stream
                 if (stream) {
                     stream.getTracks().forEach(track => track.stop());
                 }
                 
-                // Start new stream with different facing mode
                 const constraints = {
                     video: { facingMode: facingMode },
                     audio: false
@@ -897,7 +875,6 @@
                     stream.getTracks().forEach(track => track.stop());
                 }
                 
-                // Try with more specific constraints
                 const constraints = {
                     video: {
                         facingMode: facingMode,
@@ -917,7 +894,6 @@
             }
         }
         
-        // Face Verification Function
         async function verifyFace() {
             try {
                 if (!stream) {
@@ -927,19 +903,15 @@
                 
                 showLoading('Memproses...');
                 
-                // Set canvas size to match video
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 
-                // Draw video frame to canvas
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 
-                // Get image data from canvas
                 const imageData = canvas.toDataURL('image/jpeg', 0.9);
                 
                 debugLog('Image captured, sending for verification...');
                 
-                // Send image data to server
                 const verificationData = {
                     image: imageData,
                     userId: userId,
@@ -948,7 +920,6 @@
                     initData: initData
                 };
                 
-                // Perform verification API call
                 const response = await fetch('/api/verify', {
                     method: 'POST',
                     headers: {
@@ -963,7 +934,6 @@
                 if (result.success) {
                     showStatus(result.message || 'Verifikasi berhasil!', 'success');
                     
-                    // Close Telegram WebApp after delay
                     setTimeout(() => {
                         if (tg) {
                             tg.close();
@@ -980,7 +950,6 @@
             }
         }
         
-        // Signature verification functions
         async function requestSignatureVerification() {
             try {
                 showLoading('Mempersiapkan verifikasi tanda tangan...');
@@ -992,7 +961,6 @@
                     initData: initData
                 };
                 
-                // Request signature challenge from server
                 const response = await fetch('/api/alt-verify', {
                     method: 'POST',
                     headers: {
@@ -1005,19 +973,15 @@
                 debugLog(`Signature challenge result: ${JSON.stringify(result)}`);
                 
                 if (result.success) {
-                    // Store signature token and challenge
                     signatureToken = result.signatureToken;
                     challengeText = result.challenge;
                     
-                    // Show signature challenge 
                     signatureChallenge.textContent = `Silakan buat tanda tangan Anda:`;
                     
-                    // Hide camera container and show signature container
                     document.getElementById('cameraContainer').style.display = 'none';
                     signatureContainer.style.display = 'flex';
                     document.querySelectorAll('.button-group')[0].style.display = 'none';
                     
-                    // Setup signature canvas
                     setupSignatureCanvas();
                 } else {
                     showStatus(result.message || 'Gagal mempersiapkan verifikasi tanda tangan.', 'error');
@@ -1039,7 +1003,6 @@
                 
                 showLoading('Mengirim tanda tangan...');
                 
-                // Get image data from signature canvas
                 const signatureData = signatureCanvas.toDataURL('image/png');
                 
                 const verificationData = {
@@ -1050,7 +1013,6 @@
                     initData: initData
                 };
                 
-                // Submit signature for verification
                 const response = await fetch('/api/verify-signature', {
                     method: 'POST',
                     headers: {
@@ -1065,7 +1027,6 @@
                 if (result.success) {
                     showStatus(result.message || 'Verifikasi tanda tangan berhasil!', 'success');
                     
-                    // Close Telegram WebApp after delay
                     setTimeout(() => {
                         if (tg) {
                             tg.close();
@@ -1082,14 +1043,12 @@
             }
         }
         
-        // Event Listeners
         verifyBtn.addEventListener('click', verifyFace);
         cameraSwitch.addEventListener('click', switchCamera);
         altVerifyBtn.addEventListener('click', requestSignatureVerification);
         clearSignatureBtn.addEventListener('click', clearSignature);
         submitSignatureBtn.addEventListener('click', submitSignature);
         
-        // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             debugLog('DOMContentLoaded, starting initialization');
             
@@ -1097,17 +1056,14 @@
             
             debugLog('Camera initialization has been requested');
             
-            // Check if debug should be shown
             if (urlParams.get('debug') === 'true') {
                 document.getElementById('debug-console').style.display = 'block';
                 debugLog('Debug mode enabled', 'success');
             }
         });
         
-        // Handle page visibility changes
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
-                // Restart camera when page becomes visible again
                 debugLog('Page became visible, restarting camera');
                 if (!stream || stream.getTracks()[0].readyState === 'ended') {
                     startCamera();
@@ -1115,7 +1071,6 @@
             }
         });
         
-        // Check for camera permission status
         if (navigator.permissions && navigator.permissions.query) {
             navigator.permissions.query({ name: 'camera' })
             .then((permissionStatus) => {
