@@ -550,29 +550,73 @@
         const urlParams = new URLSearchParams(window.location.search);
         const token = urlParams.get('token');
         const chatId = urlParams.get('chatId');
-        const userIdFromUrl = urlParams.get('userId');
+        const intendedUserId = urlParams.get('userId');
 
         debugLog(`Raw URL parameters: ${window.location.search}`);
-        debugLog(`Extracted from URL: token=${token}, chatId=${chatId}, userId=${userIdFromUrl}`);
-        
-        if (userIdFromUrl) {
-            localStorage.setItem('userId', userIdFromUrl);
-            debugLog(`Stored userId in localStorage: ${userIdFromUrl}`, 'success');
-        }
-        
-        if (chatId) {
-            localStorage.setItem('chatId', chatId);
-            debugLog(`Stored chatId in localStorage: ${chatId}`, 'success');
-        }
-        
-        if (token) {
-            localStorage.setItem('token', token);
-            debugLog(`Stored token in localStorage: ${token}`, 'success');
-        }
-        
+        debugLog(`Extracted from URL: token=${token}, chatId=${chatId}, intendedUserId=${intendedUserId}`);
+
         let tg = null;
-        let userId = null;
+        let currentUserId = null;
         let initData = '';
+
+        if (window.Telegram && window.Telegram.WebApp) {
+            try {
+                tg = window.Telegram.WebApp;
+                debugLog(`Telegram WebApp available: true`);
+                debugLog(`WebApp version: ${tg.version}`);
+                debugLog(`Platform: ${tg.platform}`);
+        
+                initData = tg.initData || '';
+                debugLog(`Init data length: ${initData.length} characters`);
+         
+                if (tg.initDataUnsafe && tg.initDataUnsafe.user) { 
+                    currentUserId = tg.initDataUnsafe.user.id;
+                    debugLog(`Current user ID from Telegram: ${currentUserId}`, 'success');
+            
+                    // Check if this button is for the current user
+                    if (intendedUserId && currentUserId.toString() !== intendedUserId.toString()) {
+                        document.body.innerHTML = `
+                            <div style="display: flex; justify-content: center; align-items: center; height: 100vh; text-align: center; padding: 20px;">
+                                <div>
+                                    <h1 style="color: #f44336; margin-bottom: 20px;">Tombol ini bukan untuk kamu</h1>
+                                    <p>Tombol verifikasi ini hanya untuk pengguna yang memintanya.</p>
+                                </div>
+                            </div>
+                        `;
+                        return;
+                    }
+                } else {
+                    debugLog(`No user data in initDataUnsafe`, 'warning');
+                }
+        
+                tg.expand();
+                tg.MainButton.setParams({
+                    text: 'Verifikasi',
+                    color: '#3390EC'
+                });
+            } catch (e) {
+                debugLog(`Error initializing Telegram WebApp: ${e.message}`, 'error');
+            }
+        } else {
+            debugLog(`Telegram WebApp available: false`, 'warning');
+            debugLog(`WARNING: Telegram WebApp is not available!`, 'warning');
+    
+            // For non-Telegram environments, still check the intended user
+            if (intendedUserId) {
+                currentUserId = localStorage.getItem('userId');
+                if (currentUserId && currentUserId.toString() !== intendedUserId.toString()) {
+                    document.body.innerHTML = `
+                        <div style="display: flex; justify-content: center; align-items: center; height: 100vh; text-align: center; padding: 20px;">
+                            <div>
+                                <h1 style="color: #f44336; margin-bottom: 20px;">Tombol ini bukan untuk kamu</h1>
+                                <p>Tombol verifikasi ini hanya untuk pengguna yang memintanya.</p>
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+            }
+        }
         
         if (window.Telegram && window.Telegram.WebApp) {
             try {
