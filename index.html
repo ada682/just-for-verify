@@ -1051,11 +1051,37 @@
         
         document.addEventListener('DOMContentLoaded', () => {
             debugLog('DOMContentLoaded, starting initialization');
+    
+            // Check if the current user matches the userId in the URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const intendedUserId = urlParams.get('userId');
+    
+            if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                const currentUserId = tg.initDataUnsafe.user.id;
+        
+                if (intendedUserId && currentUserId.toString() !== intendedUserId.toString()) {
+                    // This button wasn't meant for this user
+                    debugLog('Button not intended for this user', 'warning');
             
+            // Show error message and close the WebApp
+                    document.body.innerHTML = `
+                        <div style="display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column; padding: 20px; text-align: center;">
+                            <h1 style="color: #f44336; margin-bottom: 20px;">Tombol ini bukan untuk kamu</h1>
+                            <p style="margin-bottom: 30px;">Tombol verifikasi ini ditujukan untuk pengguna lain. Silakan tutup halaman ini.</p>
+                            <button onclick="window.Telegram.WebApp.close()" style="padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                                Tutup
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+            }
+        
+            // Continue with normal initialization if user matches
             startCamera();
-            
+    
             debugLog('Camera initialization has been requested');
-            
+    
             if (urlParams.get('debug') === 'true') {
                 document.getElementById('debug-console').style.display = 'block';
                 debugLog('Debug mode enabled', 'success');
