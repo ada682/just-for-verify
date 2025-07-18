@@ -1056,38 +1056,30 @@
             const urlParams = new URLSearchParams(window.location.search);
             const intendedUserId = urlParams.get('userId');
 
-            // Get the actual user ID from Telegram or localStorage
-            let actualUserId = null;
             if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                actualUserId = tg.initDataUnsafe.user.id;
-            } else {
-                actualUserId = localStorage.getItem('userId');
-            }
+                const currentUserId = tg.initDataUnsafe.user.id.toString();
+                const intendedUserIdStr = intendedUserId ? intendedUserId.toString() : null;
 
-            if (intendedUserId && actualUserId && intendedUserId.toString() !== actualUserId.toString()) {
-                // This button wasn't meant for this user
-                debugLog('Button not intended for this user', 'warning');
+                if (intendedUserIdStr && currentUserId !== intendedUserIdStr) {
+                    // This button wasn't meant for this user
+                    debugLog('Button not intended for this user', 'warning');
             
-                // Show error message and close the WebApp
-                document.body.innerHTML = `
-                    <div style="display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column; padding: 20px; text-align: center; background: var(--bg-light);">
-                        <div class="card" style="max-width: 400px; text-align: center;">
-                            <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: var(--error); margin-bottom: 20px;"></i>
-                            <h1 style="color: var(--error); margin-bottom: 16px;">Tombol ini bukan untuk kamu</h1>
-                            <p style="margin-bottom: 24px; color: var(--text-secondary);">Tombol verifikasi ini ditujukan untuk pengguna lain. Silakan tutup halaman ini.</p>
-                            <button onclick="window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp.close() : window.close()" 
-                                    style="padding: 12px 24px; background: var(--error); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: 600;">
+                    // Show error message and close the WebApp
+                    document.body.innerHTML = `
+                        <div style="display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column; padding: 20px; text-align: center;">
+                            <h1 style="color: #f44336; margin-bottom: 20px;">Tombol ini bukan untuk kamu</h1>
+                            <p style="margin-bottom: 30px;">Tombol verifikasi ini ditujukan untuk pengguna lain. Silakan tutup halaman ini.</p>
+                            <button onclick="window.Telegram.WebApp.close()" style="padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer;">
                                 Tutup
                             </button>
                         </div>
-                    </div>
-                `;
-                return;
+            `        ;
+                    return;
+                }
             }
 
             // Continue with normal initialization if user matches
             startCamera();
-
             debugLog('Camera initialization has been requested');
 
             if (urlParams.get('debug') === 'true') {
